@@ -223,17 +223,30 @@ function cablecast_sync_channels($channels) {
 }
 
 function cablecast_sync_data() {
+
   $options = get_option('cablecast_options');
+  $since = get_option('cablecast_sync_since');
+if ($since == FALSE) {
+    $since = date("Y-m-d\TH:i:s", strtotime("1900-01-01T00:00:00"));
+  }
   $server = $options["server"];
-  $url = "$server/cablecastapi/v1/shows?page_size=300&include=reel,vod,project,producer,webfile";
+  print "Syncing data for $server...\n\n";
+  print "Getting shows since: $since\n";
+
+
+
+  $url = "$server/cablecastapi/v1/shows?page_size=50&include=reel,vod,webfile&since=$since&sort_order=id";
   $shows_json = file_get_contents($url);
+  $payload = json_decode($shows_json);
+
+  // TODO When Cablecast API Supports including these, take them out to make less api calls
   $channels = json_decode(file_get_contents( "$server/cablecastapi/v1/channels"));
   $categories = json_decode(file_get_contents( "$server/cablecastapi/v1/categories"));
   $producers = json_decode(file_get_contents( "$server/cablecastapi/v1/producers"));
   $projects = json_decode(file_get_contents( "$server/cablecastapi/v1/projects"));
   $two_days_ago = date('Y-m-d', strtotime("-2days"));
   $scheduleItems = json_decode(file_get_contents( "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&page_size=500"));
-  var_dump($scheduleItems->meta);
+
   $categories = $categories->categories;
   $projects = $projects->projects;
   $producers = $producers->producers;
@@ -245,8 +258,6 @@ function cablecast_sync_data() {
   cablecast_sync_categories($categories);
   cablecast_sync_schedule($scheduleItems);
 
-  $payload = json_decode($shows_json);
-  print "Syncing data for $server...\n\n";
   foreach($payload->shows as $show) {
     $args = array(
         'meta_key' => 'cablecast_show_id',
@@ -292,31 +303,34 @@ function cablecast_sync_data() {
       update_post_meta($id, "cablecast_vod_embed", $vod->embedCode, true);
     }
 
-    if (isset($show->producer)) {
+    if (empty($show->producer) == FALSE) {
       $producer = cablecast_extract_id($show->producer, $producers);
       update_post_meta($id, "cablecast_producer_name", $producer->name);
       update_post_meta($id, "cablecast_producer_id", $producer->id);
     }
 
-    if (isset($show->project)) {
+    if (empty($show->project) == FALSE) {
       $project = cablecast_extract_id($show->project, $projects);
       update_post_meta($id, "cablecast_project_name", $project->name);
       update_post_meta($id, "cablecast_project_id", $project->id);
       wp_set_post_terms( $id, $project->name, 'cablecast_project');
     }
 
-    if (isset($show->category)) {
+    if (empty($show->category) == FALSE) {
       $category = cablecast_extract_id($show->category, $categories);
       update_post_meta($id, "cablecast_category_name", $category->name);
       update_post_meta($id, "cablecast_category_id", $category->id);
       $term = get_cat_ID( $category->name);
-      echo "category: $category->name\n";
-      var_dump($term);
       wp_set_post_terms($id, $term, 'category', true);
     }
 
     update_post_meta($id, "cablecast_last_modified", $show->lastModified);
     update_post_meta($id, "cablecast_show_id", $show->id);
+
+    if (strtotime($show->eventDate) > strtotime($since)) {
+      $since = $show->eventDate;
+      update_option('cablecast_sync_since', $since);
+    }
 
   }
 
@@ -501,12 +515,14 @@ function cablecast_content_display($content){
           $show_content .= "<dd>$producer</dd>";
         }
         if (empty($project) == false) {
+          $project_link = get_term_link($project, 'cablecast_project');
           $show_content .= "<dt>Series</dt>";
-          $show_content .= "<dd>$project</dd>";
+          $show_content .= "<dd><a href=\"$project_link\">$project</a></dd>";
         }
         if (empty($category) == false) {
+          $category_link = get_term_link($category, 'category');
           $show_content .= "<dt>Category</dt>";
-          $show_content .= "<dd>$producer</dd>";
+          $show_content .= "<dd><a href=\"$category_link\">$category</a></dd>";
         }
         $show_content .= "</dl>";
         $show_content .= "</div>";
