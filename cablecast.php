@@ -224,18 +224,38 @@ function cablecast_sync_channels($channels) {
 
 function cablecast_sync_data() {
 
+
+
   $options = get_option('cablecast_options');
   $since = get_option('cablecast_sync_since');
-if ($since == FALSE) {
+  if ($since == FALSE) {
     $since = date("Y-m-d\TH:i:s", strtotime("1900-01-01T00:00:00"));
   }
   $server = $options["server"];
   print "Syncing data for $server...\n\n";
   print "Getting shows since: $since\n";
 
+  $json_search = "{\"savedShowSearch\":{\"query\":{\"groups\":[{\"orAnd\":\"and\",\"filters\":[{\"field\":\"lastModified\",\"operator\":\"greaterThan\",\"searchValue\":\"$since\"}]}],\"sortOptions\":[{\"field\":\"lastModified\",\"descending\":false},{\"field\":\"title\",\"descending\":false}]},\"name\":\"\"}}";
 
+  $opts = array('http' =>
+      array(
+          'method'  => 'POST',
+          'header'  => 'Content-Type: application/json',
+          'content' => $json_search,
+          'ignore_errors' => true
+      )
+  );
+  $context = stream_context_create($opts);
+  $result = file_get_contents("$server/cablecastapi/v1/shows/search/advanced", false, $context);
+  $result = json_decode($result);
+  $ids = array_slice($result->savedShowSearch->results, 0, 50);
 
-  $url = "$server/cablecastapi/v1/shows?page_size=50&include=reel,vod,webfile&since=$since&sort_order=id";
+  $id_query = "";
+  foreach ($ids as $id) {
+    $id_query .= "&ids[]=$id";
+  }
+
+  $url = "$server/cablecastapi/v1/shows?page_size=50&include=reel,vod,webfile$id_query";
   $shows_json = file_get_contents($url);
   $payload = json_decode($shows_json);
 
