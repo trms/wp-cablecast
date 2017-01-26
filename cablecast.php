@@ -190,7 +190,7 @@ if ( ! wp_next_scheduled( 'cablecast_cron_hook' ) ) {
   wp_schedule_event( time(), '5-seconds', 'cablecast_cron_hook' );
 }
 
-function cablecast_sync_channels($channels) {
+function cablecast_sync_channels($channels, $live_streams) {
   foreach($channels as $channel) {
     $args = array(
         'meta_key' => 'cablecast_channel_id',
@@ -213,6 +213,12 @@ function cablecast_sync_channels($channels) {
     }
 
     $post->post_title = $channel->name;
+    if (empty($channel->liveStreams) == FALSE) {
+      $live_stream = cablecast_extract_id($channel->liveStreams[0], $live_streams);
+      if ( ! add_post_meta( $post->ID, 'cablecast_channel_live_embed_code', $live_stream->embedCode, true ) ) {
+        update_post_meta ( $post->ID, 'cablecast_channel_live_embed_code', $live_stream->embedCode );
+      }
+    }
 
     if ( ! add_post_meta( $post->ID, 'cablecast_channel_id', $channel->id, true ) ) {
       update_post_meta ( $post->ID, 'cablecast_channel_id', $channel->id );
@@ -261,22 +267,24 @@ function cablecast_sync_data() {
 
   // TODO When Cablecast API Supports including these, take them out to make less api calls
   $channels = json_decode(file_get_contents( "$server/cablecastapi/v1/channels"));
+  $live_streams = json_decode(file_get_contents( "$server/cablecastapi/v1/livestreams"));
   $categories = json_decode(file_get_contents( "$server/cablecastapi/v1/categories"));
   $producers = json_decode(file_get_contents( "$server/cablecastapi/v1/producers"));
   $projects = json_decode(file_get_contents( "$server/cablecastapi/v1/projects"));
   $two_days_ago = date('Y-m-d', strtotime("-2days"));
-  $scheduleItems = json_decode(file_get_contents( "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&page_size=500"));
+  $schedule_items = json_decode(file_get_contents( "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&page_size=500"));
 
   $categories = $categories->categories;
   $projects = $projects->projects;
   $producers = $producers->producers;
   $channels = $channels->channels;
-  $scheduleItems = $scheduleItems->scheduleItems;
+  $live_streams = $live_streams->liveStreams;
+  $schedule_items = $schedule_items->scheduleItems;
 
-  cablecast_sync_channels($channels);
+  cablecast_sync_channels($channels, $live_streams);
   cablecast_sync_projects($projects);
   cablecast_sync_categories($categories);
-  cablecast_sync_schedule($scheduleItems);
+  cablecast_sync_schedule($schedule_items);
 
   foreach($payload->shows as $show) {
     $args = array(
@@ -563,6 +571,10 @@ function cablecast_content_display($content){
       $schedule_itmes = cablecast_get_schedules($channel_id, $date);
 
       $schedule_content = "<h3>Schedule For $date</h3>";
+      $channel_embed_code = get_post_meta($post->ID, 'cablecast_channel_live_embed_code', true);
+      if (empty($channel_embed_code) == false) {
+        $schedule_content .= "<div class=\"wrap\">$channel_embed_code</div>";
+      }
       $schedule_content .= "<a href=\"$prev_link\">Previous</a> | <a href=\"$next_link\">Next</a>";
       $schedule_content .= "<table><thead><tr><th>Time</th><th>Show</th></tr></thead><tbody>";
       foreach($schedule_itmes as $item) {
