@@ -89,6 +89,8 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
           'post_type'     => 'show'
       );
       $post = get_post(wp_insert_post( $post ));
+      $post->post_title = isset($show->cgTitle) ? $show->cgTitle : $show->title;
+      $post->post_content = isset($show->comments) ? $show->title : '';
     }
 
     $lastModified = get_metadata('post', $post->ID, 'cablecast_last_modified', true);
@@ -98,9 +100,6 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     }
 
     $id = $post->ID;
-
-    $post->post_title = isset($show->cgTitle) ? $show->cgTitle : $show->title;
-    $post->post_content = isset($show->comments) ? $show->title : '';
 
     $id = wp_update_post( $post );
 
@@ -139,9 +138,22 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
       $term = get_cat_ID( $category->name);
       wp_set_post_terms($id, $term, 'category', true);
     }
-
-    cablecast_upsert_post_meta($id, "cablecast_last_modified", $show->lastModified);
     cablecast_upsert_post_meta($id, "cablecast_show_id", $show->id);
+    cablecast_upsert_post_meta($id, "cablecast_show_title", $show->title);
+    cablecast_upsert_post_meta($id, "cablecast_show_cg_title", $show->cgTitle);
+    cablecast_upsert_post_meta($id, "cablecast_show_comments", $show->comments);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_1", $show->custom1);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_2", $show->custom2);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_3", $show->custom3);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_4", $show->custom4);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_5", $show->custom5);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_6", $show->custom6);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_7", $show->custom7);
+    cablecast_upsert_post_meta($id, "cablecast_show_custom_8", $show->custom8);
+    cablecast_upsert_post_meta($id, "cablecast_show_event_date", $show->eventDate);
+    cablecast_upsert_post_meta($id, "cablecast_show_location_id", $show->location);
+    cablecast_upsert_post_meta($id, "cablecast_last_modified", $show->lastModified);
+
     $trt = cablecast_calculate_trt($show, $shows_payload->reels);
     cablecast_upsert_post_meta($id, "cablecast_show_trt", $trt);
 
@@ -344,20 +356,27 @@ function cablecast_sync_projects($projects) {
 function cablecast_sync_producers($producers) {
   foreach ($producers as $producer) {
     $processed = cablecast_replace_commas_in_tag($producer->name);
+    if (empty($processed)) { return; }
+
     $term = term_exists( $processed, 'cablecast_producer' ); // array is returned if taxonomy is given
     if ($term == NULL) {
-      wp_insert_term(
+      $term = wp_insert_term(
           $processed,   // the term
           'cablecast_producer' // the taxonomy
       );
     } else {
-      /*
-      wp_update_term($term->term_id, 'cablecast_project', array(
-        'name' => $project->description,
+      wp_update_term($term['term_id'], 'cablecast_producer', array(
         'description' => empty($project->description) ? '' : $project->description,
       ));
-      */
     }
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_address', $producer->address);
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_contact', $producer->contact);
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_email', $producer->email);
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_name', $producer->name);
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_notes', $producer->notes);
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_phone_one', $producer->phoneOne);
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_phone_two', $producer->phoneTwo);
+    cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_website', $producer->website);
   }
 }
 
@@ -444,7 +463,15 @@ function cablecast_insert_attachment_from_url($webFile, $post_id = null) {
 }
 
 function cablecast_upsert_post_meta($id, $name, $value) {
+  if ($value == NULL) { $value = ''; }
   if ( ! add_post_meta( $id, $name, $value, true ) ) {
     update_post_meta ( $id, $name, $value );
+  }
+}
+
+function cablecast_upsert_term_meta($id, $name, $value) {
+  if ($value == NULL) { $value = ''; }
+  if ( ! add_term_meta( $id, $name, $value, true ) ) {
+    update_term_meta ( $id, $name, $value );
   }
 }
