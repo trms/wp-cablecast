@@ -70,11 +70,18 @@ function cablecast_register_taxonomies() {
           'edit_terms' => '',
           'delete_terms' => ''
         ),
-        'rewrite'           => ['slug' => 'series'],
+        'rewrite'           => array(
+          'slug' => 'series',
+          'with_front'    => true
+        ),
     ];
     register_taxonomy('cablecast_project', ['show'], $args);
 
     $args['labels'] = $producer_labels;
+    $args['rewrite'] = array(
+      'slug' => 'producers',
+      'with_front'    => true
+    );
     register_taxonomy('cablecast_producer', ['show'], $args);
 }
 add_action('init', 'cablecast_register_taxonomies');
