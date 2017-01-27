@@ -11,7 +11,7 @@ function cablecast_setup_post_types() {
       'supports' => array('title','thumbnail','comments', 'custom-fields'),
       'capabilities' => array('create_posts' => 'do_not_allow'),
       'map_meta_cap' => true,
-      'taxonomies' => array('category', 'cablecast_project')
+      'taxonomies' => array('category', 'cablecast_project', 'cablecast_producer')
       ] );
 
     register_post_type( 'cablecast_channel', [
@@ -43,6 +43,21 @@ function cablecast_register_taxonomies() {
         'no_terms'          => __('No Series Imported')
     ];
 
+    $producer_labels = [
+        'name'              => _x('Producers', 'taxonomy general name'),
+        'singular_name'     => _x('Producer', 'taxonomy singular name'),
+        'search_items'      => __('Search Producers'),
+        'all_items'         => __('All Producers'),
+        'parent_item'       => __('Parent Producer'),
+        'parent_item_colon' => __('Parent Producers:'),
+        'edit_item'         => __('Edit Producer'),
+        'update_item'       => __('Update Producer'),
+        'add_new_item'      => __('Add New Producer'),
+        'new_item_name'     => __('New Producer Name'),
+        'menu_name'         => __('Producers'),
+        'no_terms'          => __('No Producers Found')
+    ];
+
     $args = [
         'public'            => true,
         'labels'            => $projects_labels,
@@ -58,5 +73,8 @@ function cablecast_register_taxonomies() {
         'rewrite'           => ['slug' => 'series'],
     ];
     register_taxonomy('cablecast_project', ['show'], $args);
+
+    $args['labels'] = $producer_labels;
+    register_taxonomy('cablecast_producer', ['show'], $args);
 }
 add_action('init', 'cablecast_register_taxonomies');

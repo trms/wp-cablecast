@@ -39,11 +39,12 @@ function cablecast_content_display($content){
           $show_content .= "<dd>$pretty_trt</dd>";
         }
         if (empty($producer) == false) {
+          $producer_link = get_term_link(cablecast_replace_commas_in_tag($producer), 'cablecast_producer');
           $show_content .= "<dt>Producer</dt>";
-          $show_content .= "<dd>$producer</dd>";
+          $show_content .= "<dd><a href=\"$producer_link\">$producer</a></dd>";
         }
         if (empty($project) == false) {
-          $project_link = get_term_link($project, 'cablecast_project');
+          $project_link = get_term_link(cablecast_replace_commas_in_tag($project), 'cablecast_project');
           $show_content .= "<dt>Series</dt>";
           $show_content .= "<dd><a href=\"$project_link\">$project</a></dd>";
         }
