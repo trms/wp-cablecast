@@ -23,6 +23,7 @@ function cablecast_content_display($content){
         $producer = get_post_meta($post->ID, 'cablecast_producer_name', true);
         $category = get_post_meta($post->ID, 'cablecast_category_name', true);
         $project = get_post_meta($post->ID, 'cablecast_project_name', true);
+        $trt = get_post_meta($post->ID, 'cablecast_show_trt', true);
         $show_content =  "<div>";
         if (is_single()) {
           $show_content .= "[video src=\"$vod_url\"]";
@@ -31,6 +32,12 @@ function cablecast_content_display($content){
         $show_content .= $post->post_content;
         $show_content .= "</p>";
         $show_content .= "<dl>";
+
+        if (empty($trt) == FALSE) {
+          $show_content .= "<dt>Length</dt>";
+          $pretty_trt = gmdate('H:i:s', $trt);
+          $show_content .= "<dd>$pretty_trt</dd>";
+        }
         if (empty($producer) == false) {
           $show_content .= "<dt>Producer</dt>";
           $show_content .= "<dd>$producer</dd>";
