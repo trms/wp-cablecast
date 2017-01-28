@@ -21,7 +21,7 @@ A Cablecast show is the primary resource in Cablecast. It describes a program th
 #### Show Meta
 
 |Properties|Description|
-|-|-|
+|---|----|
 |`cablecast_show_id`| |
 |`cablecast_show_title`| |
 |`cablecast_show_event_date`| |
@@ -51,7 +51,7 @@ A Cablecast show is the primary resource in Cablecast. It describes a program th
 #### Channel Meta
 
 |Properties|Description|
-|-|-|
+|---|---|
 |`cablecast_channel_id`| |
 |`cablecast_channel_live_embed_code`| |
 
@@ -64,7 +64,7 @@ WP Cablecast creates several two custom taxonomies `Projects` and `Producers` th
 
 #### Producer Meta
 |Properties|Description|
-|-|-|
+|---|---|
 |`cablecast_producer_address`| |
 |`cablecast_producer_contact`| |
 |`cablecast_producer_email`| |
@@ -83,7 +83,7 @@ Because there are so many schedule events, the WP plugin stores the schedule eve
 The plugin provides a function `cablecast_get_schedules($channel_id, $date_start)` that can be used in themes to get schedule items. The function returns an `Array` of objects with details on a schedule item.
 
 |Property|Description|
-|-|-|
+|---|---|
 |`run_date_time`| |
 |`show_id`| |
 |`show_title`| |
