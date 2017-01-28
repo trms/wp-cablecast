@@ -203,25 +203,19 @@ function cablecast_sync_channels($channels, $live_streams) {
       $post = $posts[0];
     } else {
       $post = array(
+          'post_title'    => $channel->name,
           'post_status'   => 'publish',
           'post_type'     => 'cablecast_channel'
       );
       $post = get_post(wp_insert_post( $post ));
     }
 
-    $post->post_title = $channel->name;
     if (empty($channel->liveStreams) == FALSE) {
       $live_stream = cablecast_extract_id($channel->liveStreams[0], $live_streams);
-      if ( ! add_post_meta( $post->ID, 'cablecast_channel_live_embed_code', $live_stream->embedCode, true ) ) {
-        update_post_meta ( $post->ID, 'cablecast_channel_live_embed_code', $live_stream->embedCode );
-      }
+      cablecast_upsert_post_meta($post->ID, 'cablecast_channel_live_embed_code', $live_stream->embedCode);
     }
 
-    if ( ! add_post_meta( $post->ID, 'cablecast_channel_id', $channel->id, true ) ) {
-      update_post_meta ( $post->ID, 'cablecast_channel_id', $channel->id );
-    }
-
-    wp_update_post( $post );
+    cablecast_upsert_post_meta($post->ID, 'cablecast_channel_id', $channel->id);
   }
 }
 
