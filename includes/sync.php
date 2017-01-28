@@ -167,8 +167,8 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     cablecast_upsert_post_meta($id, "cablecast_show_trt", $trt);
 
     $since = get_option('cablecast_sync_since');
-    if (strtotime($show->eventDate) > strtotime($since)) {
-      $since = $show->eventDate;
+    if (strtotime($show->lastModified) > strtotime($since)) {
+      $since = $show->lastModified;
       update_option('cablecast_sync_since', $since);
     }
 
