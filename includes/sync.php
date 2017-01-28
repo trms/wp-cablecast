@@ -1,24 +1,19 @@
 <?php
 
-
 function cablecast_sync_data() {
   $options = get_option('cablecast_options');
   $server = $options["server"];
-  // TODO When Cablecast API Supports including these, take them out to make less api calls
-  $channels = json_decode(file_get_contents( "$server/cablecastapi/v1/channels"));
-  $live_streams = json_decode(file_get_contents( "$server/cablecastapi/v1/livestreams"));
-  $categories = json_decode(file_get_contents( "$server/cablecastapi/v1/categories"));
-  $producers = json_decode(file_get_contents( "$server/cablecastapi/v1/producers"));
-  $projects = json_decode(file_get_contents( "$server/cablecastapi/v1/projects"));
-  $two_days_ago = date('Y-m-d', strtotime("-2days"));
-  $schedule_items = json_decode(file_get_contents( "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&page_size=500"));
+  cablecast_log ("Syncing data for $server");
 
-  $categories = $categories->categories;
-  $projects = $projects->projects;
-  $producers = $producers->producers;
-  $channels = $channels->channels;
-  $live_streams = $live_streams->liveStreams;
-  $schedule_items = $schedule_items->scheduleItems;
+  $channels = cablecast_get_resources("$server/cablecastapi/v1/channels", 'channels');
+  $live_streams = cablecast_get_resources("$server/cablecastapi/v1/livestreams", 'liveStreams');
+  $categories = cablecast_get_resources("$server/cablecastapi/v1/categories", 'categories');
+  $producers = cablecast_get_resources("$server/cablecastapi/v1/producers", 'producers');
+  $projects = cablecast_get_resources("$server/cablecastapi/v1/projects", 'projects');
+
+  $two_days_ago = date('Y-m-d', strtotime("-2days"));
+  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&page_size=500";
+  $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems');
 
   $shows_payload = cablecast_get_shows_payload();
 
@@ -29,7 +24,7 @@ function cablecast_sync_data() {
 
   cablecast_sync_shows($shows_payload, $categories, $projects, $producers);
   cablecast_sync_schedule($schedule_items);
-
+  cablecast_log( "Finished");
 }
 
 function cablecast_get_shows_payload() {
@@ -39,8 +34,7 @@ function cablecast_get_shows_payload() {
     $since = date("Y-m-d\TH:i:s", strtotime("1900-01-01T00:00:00"));
   }
   $server = $options["server"];
-  print "Syncing data for $server...\n\n";
-  print "Getting shows since: $since\n";
+  cablecast_log ("Getting shows since: $since" );
 
   $json_search = "{\"savedShowSearch\":{\"query\":{\"groups\":[{\"orAnd\":\"and\",\"filters\":[{\"field\":\"lastModified\",\"operator\":\"greaterThan\",\"searchValue\":\"$since\"}]}],\"sortOptions\":[{\"field\":\"lastModified\",\"descending\":false},{\"field\":\"title\",\"descending\":false}]},\"name\":\"\"}}";
 
@@ -70,8 +64,22 @@ function cablecast_get_shows_payload() {
   return $shows_payload;
 }
 
+function cablecast_get_resources($url, $key) {
+  $resources = [];
+  try {
+    cablecast_log("Retreiving $key from $url");
+    $result = json_decode(file_get_contents($url));
+    $resources = $result->$key;
+  } catch (Exception $e) {
+    cablecast_log("Error retreiving \"$key\"" . $e->message);
+  }
+  return $resources;
+}
+
 function cablecast_sync_shows($shows_payload, $categories, $projects, $producers) {
   foreach($shows_payload->shows as $show) {
+    if (empty($show->title) )
+    cablecast_log ("Syncing Show: ($show->id) $show->title");
     $args = array(
         'meta_key' => 'cablecast_show_id',
         'meta_value' => $show->id,
@@ -85,12 +93,13 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
       $post = $posts[0];
     } else {
       $post = array(
+          'post_title'    => isset($show->cgTitle) ? $show->cgTitle : $show->title,
+          'post_content'  => isset($show->comments) ? $show->title : '',
+          'post_date'     => $show->eventDate,
           'post_status'   => 'publish',
           'post_type'     => 'show'
       );
       $post = get_post(wp_insert_post( $post ));
-      $post->post_title = isset($show->cgTitle) ? $show->cgTitle : $show->title;
-      $post->post_content = isset($show->comments) ? $show->title : '';
     }
 
     $lastModified = get_metadata('post', $post->ID, 'cablecast_last_modified', true);
@@ -253,18 +262,6 @@ function cablecast_get_schedule_item_by_id($id) {
 }
 
 function cablecast_sync_schedule($scheduleItems) {
-  /*
-  $sql = "CREATE TABLE $table_name (
-    id mediumint(9) NOT NULL AUTO_INCREMENT,
-    run_date_time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-    show_id int NOT NULL,
-    show_title varchar(255) DEFAULT '' NOT NULL,
-    channel_id int NOT NULL,
-    show_post_id int NOT NULL,
-    channel_post_id int NOT NULL,
-    PRIMARY KEY  (id)
-  ) $charset_collate;";
-  */
   global $wpdb;
   foreach($scheduleItems as $item) {
     $table = $wpdb->prefix . 'cablecast_schedule_items';
@@ -319,13 +316,6 @@ function cablecast_sync_categories($categories) {
           $category->name,   // the term
           'category' // the taxonomy
       );
-    } else {
-      /*
-      wp_update_term($term->term_id, 'cablecast_project', array(
-        'name' => $project->description,
-        'description' => empty($project->description) ? '' : $project->description,
-      ));
-      */
     }
   }
 }
@@ -343,12 +333,9 @@ function cablecast_sync_projects($projects) {
           )
       );
     } else {
-      /*
-      wp_update_term($term->term_id, 'cablecast_project', array(
-        'name' => $project->description,
+      wp_update_term($term['term_id'], 'cablecast_project', array(
         'description' => empty($project->description) ? '' : $project->description,
       ));
-      */
     }
   }
 }
@@ -474,4 +461,8 @@ function cablecast_upsert_term_meta($id, $name, $value) {
   if ( ! add_term_meta( $id, $name, $value, true ) ) {
     update_term_meta ( $id, $name, $value );
   }
+}
+
+function cablecast_log ($message) {
+  error_log("[Cablecast] $message");
 }

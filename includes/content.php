@@ -22,7 +22,8 @@ function cablecast_setup_post_types() {
       ],
       'supports' => array('title', 'custom-fields'),
       'capabilities' => array('create_posts' => 'do_not_allow'),
-      'map_meta_cap' => true
+      'map_meta_cap' => true,
+      'rewrite' => ['slug' => 'channel']
       ] );
 }
 add_action( 'init', 'cablecast_setup_post_types' );

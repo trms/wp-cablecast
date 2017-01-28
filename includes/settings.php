@@ -49,9 +49,6 @@ add_action('admin_init', 'cablecast_settings_init');
 // the values are defined at the add_settings_section() function.
 function cablecast_section_developers_cb($args)
 {
-    ?>
-    <p>Server Address</p>
-    <?php
 }
 
 // pill field cb
@@ -68,7 +65,7 @@ function cablecast_field_server_cb($args)
     $options = get_option('cablecast_options');
     // output the field
     ?>
-    <input type="text" name="cablecast_options[server]" value="<?= isset($options['server']) ? esc_attr($options['server']) : ''; ?>">
+    <input type="url" name="cablecast_options[server]" class="regular-text code" value="<?= isset($options['server']) ? esc_attr($options['server']) : ''; ?>">
 
     <?php
 }
@@ -113,14 +110,23 @@ function cablecast_options_page_html()
         add_settings_error('cablecast_messages', 'cablecast_message', __('Settings Saved', 'cablecast'), 'updated');
     }
 
-    // show error/update messages
     settings_errors('cablecast_messages');
+
+    if (defined('DISABLE_WP_CRON') == false || DISABLE_WP_CRON == false) {
+      ?>
+      <div class="notice notice-warning">
+        <p>WordPress's built in cron is still enabled. This causes the cablecast plugin to attempt to sync during regular web requests which can lead to failures and poor user expericnes. It is recomended to disable the built in cron and instead run cron using the system task scheduler. See <a href="https://developer.wordpress.org/plugins/cron/hooking-into-the-system-task-scheduler/">https://developer.wordpress.org/plugins/cron/hooking-into-the-system-task-scheduler/</a> for more info.</p>
+      </div>
+      <?php
+    }
+
     ?>
+
     <div class="wrap">
         <h1><?= esc_html(get_admin_page_title()); ?></h1>
-        <p>
-          <strong>Current Sync</strong>: <?= esc_html(get_option('cablecast_sync_since')); ?>
-        </p>
+        <div class="notice notice-info">
+          <p><strong>Current Sync</strong>: <?= esc_html(get_option('cablecast_sync_since')); ?></p>
+        </div>
         <form action="options.php" method="post">
             <?php
             // output security fields for the registered setting "cablecast"
