@@ -1,6 +1,9 @@
 # WP Cablecast
 The WP Cablecast plugin aims to provide an easy way for WordPress site builders to integrate data from a Cablecast system into WordPress. The plugin handles importing `Shows`, `Channels`, `ScheduleItems`, `Projects`, `Producers`, `Categories` into WordPress so they can be queried and displayed the same as any other WordPress post.
 
+## Getting Started Video
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/ARXSms9K_UE/0.jpg)](http://www.youtube.com/watch?v=ARXSms9K_UE "Video Title")
+
 ## Demo
 I've set up a simple demo site that I'll be expanding with examples of how to do common things as questions are asked. Checkout http://wp-cablecast.raytiley.com to see what this plugin does.
 
