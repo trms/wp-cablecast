@@ -31,30 +31,31 @@ function cablecast_content_display($content){
         $show_content .= "<p>";
         $show_content .= $post->post_content;
         $show_content .= "</p>";
-        $show_content .= "<dl>";
-
-        if (empty($trt) == FALSE) {
-          $show_content .= "<dt>Length</dt>";
-          $pretty_trt = gmdate('H:i:s', $trt);
-          $show_content .= "<dd>$pretty_trt</dd>";
+        $show_content .= "<ul>";
+        if (is_single()) {
+          if (empty($trt) == FALSE) {
+            $show_content .= "<li>Length: ";
+            $pretty_trt = gmdate('H:i:s', $trt);
+            $show_content .= "$pretty_trt</li>";
+          }
+          if (empty($producer) == false) {
+            $producer_link = get_term_link(cablecast_replace_commas_in_tag($producer), 'cablecast_producer');
+            $show_content .= "<li>Producer: ";
+            $show_content .= "<a href=\"$producer_link\">$producer</a></li>";
+          }
+          if (empty($project) == false) {
+            $project_link = get_term_link(cablecast_replace_commas_in_tag($project), 'cablecast_project');
+            $show_content .= "<li>Series: ";
+            $show_content .= "<a href=\"$project_link\">$project</a></li>";
+          }
+          if (empty($category) == false) {
+            $category_link = get_term_link($category, 'category');
+            $show_content .= "<li>Category: ";
+            $show_content .= "<a href=\"$category_link\">$category</a></li>";
+          }
+          $show_content .= "</ul>";
+          $show_content .= "</div>";
         }
-        if (empty($producer) == false) {
-          $producer_link = get_term_link(cablecast_replace_commas_in_tag($producer), 'cablecast_producer');
-          $show_content .= "<dt>Producer</dt>";
-          $show_content .= "<dd><a href=\"$producer_link\">$producer</a></dd>";
-        }
-        if (empty($project) == false) {
-          $project_link = get_term_link(cablecast_replace_commas_in_tag($project), 'cablecast_project');
-          $show_content .= "<dt>Series</dt>";
-          $show_content .= "<dd><a href=\"$project_link\">$project</a></dd>";
-        }
-        if (empty($category) == false) {
-          $category_link = get_term_link($category, 'category');
-          $show_content .= "<dt>Category</dt>";
-          $show_content .= "<dd><a href=\"$category_link\">$category</a></dd>";
-        }
-        $show_content .= "</dl>";
-        $show_content .= "</div>";
         return do_shortcode($show_content);
     } else if ($post->post_type == 'cablecast_channel' && is_single() && in_the_loop() && is_main_query()) {
       $channel_id = get_post_meta($post->ID, 'cablecast_channel_id', true);

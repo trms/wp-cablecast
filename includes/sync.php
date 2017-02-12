@@ -116,7 +116,7 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     } else {
       $post = array(
           'post_title'    => isset($show->cgTitle) ? $show->cgTitle : $show->title,
-          'post_content'  => isset($show->comments) ? $show->title : '',
+          'post_content'  => isset($show->comments) ? $show->comments : '',
           'post_date'     => $show->eventDate,
           'post_status'   => 'publish',
           'post_type'     => 'show'
@@ -132,42 +132,50 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
 
     $id = $post->ID;
 
-    $id = wp_update_post( $post );
-
     if (isset($show->showThumbnailOriginal)) {
       $webFile = cablecast_extract_id($show->showThumbnailOriginal, $shows_payload->webFiles);
-      $thumbnail_id = cablecast_insert_attachment_from_url($webFile, $id);
-      set_post_thumbnail( $id, $thumbnail_id );
+      if ($webFile != NULL) {
+        $thumbnail_id = cablecast_insert_attachment_from_url($webFile, $id);
+        set_post_thumbnail( $id, $thumbnail_id );
+      }
     }
 
     if (isset($show->vods) && count($show->vods)) {
       $vod = cablecast_extract_id($show->vods[0], $shows_payload->vods);
-      cablecast_upsert_post_meta($id, "cablecast_vod_url", $vod->url);
-      cablecast_upsert_post_meta($id, "cablecast_vod_embed", $vod->embedCode);
+      if ($vod != NULL) {
+        cablecast_upsert_post_meta($id, "cablecast_vod_url", $vod->url);
+        cablecast_upsert_post_meta($id, "cablecast_vod_embed", $vod->embedCode);
+      }
     }
 
     if (empty($show->producer) == FALSE) {
       $producer = cablecast_extract_id($show->producer, $producers);
-      cablecast_upsert_post_meta($id, "cablecast_producer_name", $producer->name);
-      cablecast_upsert_post_meta($id, "cablecast_producer_id", $producer->id);
-      $processed_producer = cablecast_replace_commas_in_tag($producer->name);
-      wp_set_post_terms( $id, $processed_producer, 'cablecast_producer');
+      if ($producer != NULL) {
+        cablecast_upsert_post_meta($id, "cablecast_producer_name", $producer->name);
+        cablecast_upsert_post_meta($id, "cablecast_producer_id", $producer->id);
+        $processed_producer = cablecast_replace_commas_in_tag($producer->name);
+        wp_set_post_terms( $id, $processed_producer, 'cablecast_producer');
+      }
     }
 
     if (empty($show->project) == FALSE) {
       $project = cablecast_extract_id($show->project, $projects);
-      cablecast_upsert_post_meta($id, "cablecast_project_name", $project->name);
-      cablecast_upsert_post_meta($id, "cablecast_project_id", $project->id);
-      $processed_project = cablecast_replace_commas_in_tag($project->name);
-      wp_set_post_terms( $id, $processed_project, 'cablecast_project');
+      if ($project != NULL) {
+        cablecast_upsert_post_meta($id, "cablecast_project_name", $project->name);
+        cablecast_upsert_post_meta($id, "cablecast_project_id", $project->id);
+        $processed_project = cablecast_replace_commas_in_tag($project->name);
+        wp_set_post_terms( $id, $processed_project, 'cablecast_project');
+      }
     }
 
     if (empty($show->category) == FALSE) {
       $category = cablecast_extract_id($show->category, $categories);
-      cablecast_upsert_post_meta($id, "cablecast_category_name", $category->name);
-      cablecast_upsert_post_meta($id, "cablecast_category_id", $category->id);
-      $term = get_cat_ID( $category->name);
-      wp_set_post_terms($id, $term, 'category', true);
+      if ($category != NULL) {
+        cablecast_upsert_post_meta($id, "cablecast_category_name", $category->name);
+        cablecast_upsert_post_meta($id, "cablecast_category_id", $category->id);
+        $term = get_cat_ID( $category->name);
+        wp_set_post_terms($id, $term, 'category', true);
+      }
     }
     cablecast_upsert_post_meta($id, "cablecast_show_id", $show->id);
     cablecast_upsert_post_meta($id, "cablecast_show_title", $show->title);
