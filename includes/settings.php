@@ -121,11 +121,22 @@ function cablecast_options_page_html()
     }
 
     ?>
+    <?php
+      $total = get_option('cablecast_sync_total_result_count');
+      $sync_index = get_option('cablecast_sync_index');
+      if ($total == FALSE) {
+        $total = 0;
+      }
+      if ($sync_index == FALSE) {
+        $sync_index = 0;
+      }
+      $remaining = $total - $sync_index;
+     ?>
 
     <div class="wrap">
         <h1><?= esc_html(get_admin_page_title()); ?></h1>
         <div class="notice notice-info">
-          <p><strong>Current Sync</strong>: <?= esc_html(get_option('cablecast_sync_since')); ?></p>
+          <p>There are <?= $remaining ?> remaining shows out of  <?= $total ?> shows updated after <?= esc_html(get_option('cablecast_sync_since')); ?></p>
         </div>
         <form action="options.php" method="post">
             <?php

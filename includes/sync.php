@@ -33,6 +33,10 @@ function cablecast_get_shows_payload() {
   if ($since == FALSE) {
     $since = date("Y-m-d\TH:i:s", strtotime("1900-01-01T00:00:00"));
   }
+  $sync_index = get_option('cablecast_sync_index');
+  if ($sync_index == FALSE) {
+    $sync_index = 0;
+  }
   $server = $options["server"];
   cablecast_log ("Getting shows since: $since" );
 
@@ -49,7 +53,20 @@ function cablecast_get_shows_payload() {
   $context = stream_context_create($opts);
   $result = file_get_contents("$server/cablecastapi/v1/shows/search/advanced", false, $context);
   $result = json_decode($result);
-  $ids = array_slice($result->savedShowSearch->results, 0, 50);
+
+
+  $total_result_count = count($result->savedShowSearch->results);
+  if ($total_result_count <= $sync_index) {
+    $sync_index = 0;
+    update_option('cablecast_sync_index', $sync_index);
+  }
+
+  $ids = array_slice($result->savedShowSearch->results, $sync_index, 50);
+  $processing_result_count = count($ids);
+  $end_index = $sync_index + $processing_result_count;
+
+  update_option('cablecast_sync_total_result_count', $total_result_count);
+  cablecast_log("Processing $sync_index through $end_index out of $total_result_count results for search");
 
   $id_query = "";
   foreach ($ids as $id) {
@@ -77,8 +94,13 @@ function cablecast_get_resources($url, $key) {
 }
 
 function cablecast_sync_shows($shows_payload, $categories, $projects, $producers) {
+  $sync_total_result_count = get_option('cablecast_sync_total_result_count');
+  $sync_index = get_option('cablecast_sync_index');
+  if ($sync_index == FALSE) {
+    $sync_index = 0;
+  }
+
   foreach($shows_payload->shows as $show) {
-    if (empty($show->title) )
     cablecast_log ("Syncing Show: ($show->id) $show->title");
     $args = array(
         'meta_key' => 'cablecast_show_id',
@@ -167,11 +189,13 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     cablecast_upsert_post_meta($id, "cablecast_show_trt", $trt);
 
     $since = get_option('cablecast_sync_since');
-    if (strtotime($show->lastModified) > strtotime($since)) {
+    $sync_index = $sync_index + 1;
+    update_option('cablecast_sync_index', $sync_index);
+    if ($sync_index >= $sync_total_result_count && strtotime($show->lastModified) >= strtotime($since)) {
       $since = $show->lastModified;
+      update_option('cablecast_sync_index', 0);
       update_option('cablecast_sync_since', $since);
     }
-
   }
 }
 
