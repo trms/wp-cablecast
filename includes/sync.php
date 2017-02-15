@@ -119,7 +119,7 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
           'post_content'  => isset($show->comments) ? $show->comments : '',
           'post_date'     => $show->eventDate,
           'post_status'   => 'publish',
-          'post_type'     => 'show'
+          'post_type'     => 'show',
           'meta_input'    => array(
             'cablecast_show_id' => $show->id
           )
