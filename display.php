@@ -26,7 +26,8 @@ function cablecast_content_display($content){
         $trt = get_post_meta($post->ID, 'cablecast_show_trt', true);
         $show_content =  "<div>";
         if (is_single()) {
-          $show_content .= "[video src=\"$vod_url\"]";
+          $vod_poster = get_the_post_thumbnail_url();
+          $show_content .= "[video src=\"$vod_url\" poster=\"$vod_poster\" autoplay=\"true\"]";
         }
         $show_content .= "<p>";
         $show_content .= $post->post_content;
