@@ -61,7 +61,7 @@ function cablecast_get_shows_payload() {
     update_option('cablecast_sync_index', $sync_index);
   }
 
-  $ids = array_slice($result->savedShowSearch->results, $sync_index, 50);
+  $ids = array_slice($result->savedShowSearch->results, $sync_index, 100);
   $processing_result_count = count($ids);
   $end_index = $sync_index + $processing_result_count;
 
@@ -73,7 +73,8 @@ function cablecast_get_shows_payload() {
     $id_query .= "&ids[]=$id";
   }
 
-  $url = "$server/cablecastapi/v1/shows?include=reel,vod,webfile$id_query";
+  $url = "$server/cablecastapi/v1/shows?page_size=100&include=reel,vod,webfile$id_query";
+  cablecast_log("Retreving shows from using: $url");
 
   $shows_json = file_get_contents($url);
   $shows_payload = json_decode($shows_json);
@@ -204,6 +205,7 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     update_option('cablecast_sync_index', $sync_index);
     if ($sync_index >= $sync_total_result_count && strtotime($show->lastModified) >= strtotime($since)) {
       $since = $show->lastModified;
+      update_option('cablecast_sync_total_result_count', 0);
       update_option('cablecast_sync_index', 0);
       update_option('cablecast_sync_since', $since);
     }
