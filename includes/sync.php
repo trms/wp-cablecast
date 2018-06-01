@@ -295,6 +295,7 @@ function cablecast_get_schedule_item_by_id($id) {
 function cablecast_sync_schedule($scheduleItems) {
   global $wpdb;
   foreach($scheduleItems as $item) {
+    if (!$item->show) { continue; }
     $table = $wpdb->prefix . 'cablecast_schedule_items';
     $existing_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE schedule_item_id=%d", $item->id));
     $show = cablecast_get_show_post_by_id($item->show);

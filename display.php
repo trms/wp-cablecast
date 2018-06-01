@@ -82,7 +82,7 @@ function cablecast_content_display($content){
       foreach($schedule_itmes as $item) {
         $show_link = get_post_permalink($item->show_post_id);
         if (empty($show_link)) { continue; }
-        $time = date('h:m a', strtotime($item->run_date_time));
+        $time = date('h:i a', strtotime($item->run_date_time));
         $title = $item->show_title;
         $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\">$item->show_title</a></td></tr>";
       }
