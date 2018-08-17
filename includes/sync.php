@@ -159,6 +159,12 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     cablecast_upsert_post_meta($id, "cablecast_show_custom_6", $show->custom6);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_7", $show->custom7);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_8", $show->custom8);
+    // load new custom fields from >= 6.4
+    foreach ($show->customFields as $custom_field) {
+      // Look up name of field
+      $field_name = "TODO"
+      cablecast_upsert_post_meta($id,  $field_name, $custom_field->value)     
+    }
     cablecast_upsert_post_meta($id, "cablecast_show_event_date", $show->eventDate);
     cablecast_upsert_post_meta($id, "cablecast_show_location_id", $show->location);
     cablecast_upsert_post_meta($id, "cablecast_last_modified", $show->lastModified);
