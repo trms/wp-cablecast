@@ -10,6 +10,8 @@ function cablecast_sync_data() {
   $categories = cablecast_get_resources("$server/cablecastapi/v1/categories", 'categories');
   $producers = cablecast_get_resources("$server/cablecastapi/v1/producers", 'producers');
   $projects = cablecast_get_resources("$server/cablecastapi/v1/projects", 'projects');
+  $show_fields = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'showFields');
+  $field_definitions = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'fieldDefinitions');
 
   $two_days_ago = date('Y-m-d', strtotime("-2days"));
   $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&page_size=500";
@@ -22,7 +24,7 @@ function cablecast_sync_data() {
   cablecast_sync_producers($producers);
   cablecast_sync_categories($categories);
 
-  cablecast_sync_shows($shows_payload, $categories, $projects, $producers);
+  cablecast_sync_shows($shows_payload, $categories, $projects, $producers, $show_fields, $field_definitions);
   cablecast_sync_schedule($schedule_items);
   cablecast_log( "Finished");
 }
@@ -94,7 +96,7 @@ function cablecast_get_resources($url, $key) {
   return $resources;
 }
 
-function cablecast_sync_shows($shows_payload, $categories, $projects, $producers) {
+function cablecast_sync_shows($shows_payload, $categories, $projects, $producers, $show_fields, $field_definitions) {
   $sync_total_result_count = get_option('cablecast_sync_total_result_count');
   $sync_index = get_option('cablecast_sync_index');
   if ($sync_index == FALSE) {
@@ -193,6 +195,15 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     cablecast_upsert_post_meta($id, "cablecast_show_custom_6", $show->custom6);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_7", $show->custom7);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_8", $show->custom8);
+    if (isset($show->customFields)) {
+      foreach ($show->customFields as $custom_field) {
+        // Look up name of field
+        $show_field = cablecast_extract_id($custom_field->showField, $show_fields);
+        $field_definition = cablecast_extract_id($show_field->fieldDefinition, $field_definitions);
+        cablecast_upsert_post_meta($id,  $field_definition->name, $custom_field->value);
+      }
+    }
+
     cablecast_upsert_post_meta($id, "cablecast_show_event_date", $show->eventDate);
     cablecast_upsert_post_meta($id, "cablecast_show_location_id", $show->location);
     cablecast_upsert_post_meta($id, "cablecast_last_modified", $show->lastModified);
