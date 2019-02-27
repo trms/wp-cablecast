@@ -116,6 +116,15 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     $posts = get_posts($args);
     if (count($posts)) {
       $post = $posts[0];
+
+      $update_params = array(
+        'ID'            => $post->ID,
+        'post_title'    => isset($show->cgTitle) ? $show->cgTitle : $show->title,
+        'post_content'  => isset($show->comments) ? $show->comments : ''
+      );
+
+      wp_update_post($update_params);
+      
     } else {
       $post = array(
           'post_title'    => isset($show->cgTitle) ? $show->cgTitle : $show->title,
