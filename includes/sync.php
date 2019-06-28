@@ -462,8 +462,8 @@ function cablecast_insert_attachment_from_url($webFile, $post_id = null) {
 	$http = new WP_Http();
 	$response = $http->request( $url, array('timeout' => 20));
 
-	if( $response['response']['code'] != 200 ) {
-		return false;
+	if (is_wp_error($response) || $response['response']['code'] != 200 ) { 
+	return;
 	}
 
 	$upload = wp_upload_bits( basename($url), null, $response['body'] );
