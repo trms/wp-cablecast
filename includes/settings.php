@@ -115,7 +115,7 @@ function cablecast_options_page_html()
     if (defined('DISABLE_WP_CRON') == false || DISABLE_WP_CRON == false) {
       ?>
       <div class="notice notice-warning">
-        <p>WordPress's built in cron is still enabled. This causes the cablecast plugin to attempt to sync during regular web requests which can lead to failures and poor user expericnes. It is recomended to disable the built in cron and instead run cron using the system task scheduler. See <a href="https://developer.wordpress.org/plugins/cron/hooking-into-the-system-task-scheduler/">https://developer.wordpress.org/plugins/cron/hooking-into-the-system-task-scheduler/</a> for more info.</p>
+        <p>WordPress's built in cron is still enabled. This causes the cablecast plugin to attempt to sync during regular web requests which can lead to failures and poor user expericnes. It is recomended to disable the built in cron and instead run cron using the system task scheduler. See <a href="https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/">https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/</a> for more info.</p>
       </div>
       <?php
     }
