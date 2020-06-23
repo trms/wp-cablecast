@@ -102,3 +102,8 @@ By default the plugin will modify the content when viewing a `Channel` to place 
 
 ### How do I show the vod for a show?
 The vod embed code and url are set as custom meta on the `Show` in the `cablecast_show_vod_embed` and `cablecast_show_vod_url` respectivly.
+
+### How do I show what's playing right now and what's coming up next?
+Use this code: https://gist.github.com/bryanharley/7986451176db08f982683c1b973abc8c. Change the default timezone and $ChannelID as necessary. Insert the code in your theme file where desired. 
+
+
