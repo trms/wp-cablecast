@@ -120,7 +120,8 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
       $update_params = array(
         'ID'            => $post->ID,
         'post_title'    => isset($show->cgTitle) ? $show->cgTitle : $show->title,
-        'post_content'  => isset($show->comments) ? $show->comments : ''
+        'post_content'  => isset($show->comments) ? $show->comments : '',
+        'post_date'     => $show->eventDate
       );
 
       wp_update_post($update_params);
