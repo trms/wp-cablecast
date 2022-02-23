@@ -14,8 +14,8 @@ function cablecast_sync_data() {
   $field_definitions = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'fieldDefinitions');
 
   $two_days_ago = date('Y-m-d', strtotime("-2days"));
-  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&page_size=500";
-  $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems');
+  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&include_deleted=true";
+  $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems', TRUE);
 
   $shows_payload = cablecast_get_shows_payload();
 
@@ -84,11 +84,26 @@ function cablecast_get_shows_payload() {
   return $shows_payload;
 }
 
-function cablecast_get_resources($url, $key) {
+function cablecast_get_resources($url, $key, $ensure_all_loaded = FALSE) {
   $resources = [];
+  $paged_url = $url;
+  // give an inital high best guess page size to try and do this in one request.
+  $page_size = 500;
   try {
-    cablecast_log("Retreiving $key from $url");
-    $result = json_decode(file_get_contents($url));
+    if ($ensure_all_loaded) {
+      $paged_url = "$url&page_size=$page_size";
+    }
+
+    cablecast_log("Retreiving $key from $paged_url");
+    $result = json_decode(file_get_contents($paged_url));
+
+    if ($ensure_all_loaded && $result->meta->count > $result->meta->pageSize) {
+      cablecast_log("Not enough schedule items loaded. Increase page size");
+      $page_size = $result->meta->count + 10;
+      $paged_url = "$url&page_size=$page_size";
+      cablecast_log("Retreiving $key from $paged_url");
+      $result = json_decode(file_get_contents($paged_url));
+    }
     $resources = $result->$key;
   } catch (Exception $e) {
     cablecast_log("Error retreiving \"$key\"" . $e->message);
@@ -120,7 +135,8 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
       $update_params = array(
         'ID'            => $post->ID,
         'post_title'    => isset($show->cgTitle) ? $show->cgTitle : $show->title,
-        'post_content'  => isset($show->comments) ? $show->comments : ''
+        'post_content'  => isset($show->comments) ? $show->comments : '',
+        'post_date'     => $show->eventDate
       );
 
       wp_update_post($update_params);
