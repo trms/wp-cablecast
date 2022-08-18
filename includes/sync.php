@@ -163,10 +163,14 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
 
     $id = $post->ID;
 
+    if (isset($show->thumbnailImage) && isset($show->thumbnailImage->url)) {
+      $thumbnail_id = cablecast_insert_attachment_from_url($show->thumbnailImage->url, $id, true);
+    }
+
     if (isset($show->showThumbnailOriginal)) {
       $webFile = cablecast_extract_id($show->showThumbnailOriginal, $shows_payload->webFiles);
       if ($webFile != NULL) {
-        $thumbnail_id = cablecast_insert_attachment_from_url($webFile, $id);
+        $thumbnail_id = cablecast_insert_attachment_from_url($webFile->url, $id);
         set_post_thumbnail( $id, $thumbnail_id );
       }
     }
@@ -458,10 +462,11 @@ function cablecast_extract_id($id, $records) {
  * @param  Array  $meta_data
  * @return Int    Attachment ID
  */
-function cablecast_insert_attachment_from_url($webFile, $post_id = null) {
-  $url = $webFile->url;
+function cablecast_insert_attachment_from_url($url, $post_id, $dynamic_files_api=false) {
+  
+  $name = basename($url);
   $args = array(
-      'title' => $webFile->name,
+      'title' => $name,
       'post_type' => 'attachment',
       'post_status' => 'any',
       'posts_per_page' => -1
@@ -479,10 +484,20 @@ function cablecast_insert_attachment_from_url($webFile, $post_id = null) {
 	$response = $http->request( $url, array('timeout' => 20));
 
 	if (is_wp_error($response) || $response['response']['code'] != 200 ) { 
-	return;
+    echo "Got an error";
+	  return;
 	}
+  
+  $file_name = $name;
+  if ($dynamic_files_api) {
+    $content_type = $response['headers']['content-type'];
+    $file_name = $name . ".jpg";
+    if ($content_type == "image/png") {
+      $file_name = $name . ".png";
+    }
+  }
 
-	$upload = wp_upload_bits( basename($url), null, $response['body'] );
+	$upload = wp_upload_bits( $file_name, null, $response['body'] );
 	if( !empty( $upload['error'] ) ) {
 		return false;
 	}
@@ -496,7 +511,7 @@ function cablecast_insert_attachment_from_url($webFile, $post_id = null) {
 	$post_info = array(
 		'guid'				=> $wp_upload_dir['url'] . '/' . $file_name,
 		'post_mime_type'	=> $file_type['type'],
-		'post_title'		=> $webFile->name,
+		'post_title'		=> $name,
 		'post_content'		=> '',
 		'post_status'		=> 'inherit',
 	);
