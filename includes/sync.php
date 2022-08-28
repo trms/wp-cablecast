@@ -165,6 +165,7 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
 
     if (isset($show->thumbnailImage) && isset($show->thumbnailImage->url)) {
       $thumbnail_id = cablecast_insert_attachment_from_url($show->thumbnailImage->url, $id, true);
+      set_post_thumbnail( $id, $thumbnail_id );
     }
 
     if (isset($show->showThumbnailOriginal)) {
