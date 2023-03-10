@@ -14,7 +14,8 @@ function cablecast_sync_data() {
   $field_definitions = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'fieldDefinitions');
 
   $two_days_ago = date('Y-m-d', strtotime("-2days"));
-  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&include_deleted=true";
+  $three_months_future = date('Y-m-d', strtotime("+90days"));
+  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&end=$three_months_future&page_size=500&include_cg_exempt=false";
   $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems', TRUE);
 
   $shows_payload = cablecast_get_shows_payload();
