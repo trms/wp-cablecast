@@ -11,7 +11,8 @@ function cablecast_setup_post_types() {
       'supports' => array('title','thumbnail','comments', 'custom-fields'),
       'capabilities' => array('create_posts' => 'do_not_allow'),
       'map_meta_cap' => true,
-      'taxonomies' => array('category', 'cablecast_project', 'cablecast_producer')
+      'taxonomies' => array('category', 'cablecast_project', 'cablecast_producer'),
+      'has_archive' => 'shows',
       ] );
 
     register_post_type( 'cablecast_channel', [
