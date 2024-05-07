@@ -11,7 +11,8 @@ function cablecast_setup_post_types() {
       'supports' => array('title','thumbnail','comments', 'custom-fields'),
       'capabilities' => array('create_posts' => 'do_not_allow'),
       'map_meta_cap' => true,
-      'taxonomies' => array('category', 'cablecast_project', 'cablecast_producer')
+      'taxonomies' => array('category', 'cablecast_project', 'cablecast_producer'),
+      'has_archive' => 'shows',
       ] );
 
     register_post_type( 'cablecast_channel', [
@@ -84,5 +85,29 @@ function cablecast_register_taxonomies() {
       'with_front'    => true
     );
     register_taxonomy('cablecast_producer', ['show'], $args);
+
+    $definitions = get_option('cablecast_custom_taxonomy_definitions');
+    if (!empty($definitions->showFields)) {
+      cablecast_register_show_field_taxonomies($definitions);
+    }
 }
 add_action('init', 'cablecast_register_taxonomies');
+
+
+function cablecast_register_show_field_taxonomies($definitions) {
+  foreach ($definitions->showFields as $show_field) {
+      $field_def = cablecast_extract_id($show_field->fieldDefinition, $definitions->fieldDefinitions);
+      $tax_name = "cbl-tax-" . $show_field->id;
+      if ($field_def->name && 
+          ($field_def->type === "tag" || $field_def->type === "select") && 
+          !taxonomy_exists($tax_name)) {
+          $result = register_taxonomy($tax_name, ['show'], array(
+              'label' => $field_def->name,
+              'name' => _x($field_def->name, 'taxonomy general name'),
+              'public' => true,
+              'rewrite' => array('slug' => sanitize_title("cbl-" . $field_def->name), 'with_front' => true ),
+              'hierarchical' => false,
+          ));
+      }
+  }
+}

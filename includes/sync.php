@@ -5,6 +5,11 @@ function cablecast_sync_data() {
   $server = $options["server"];
   cablecast_log ("Syncing data for $server");
 
+  $field_definitions = json_decode(file_get_contents("$server/cablecastapi/v1/showfields"));
+  if (isset($field_definitions->fieldDefinitions) && isset($field_definitions->showFields)) {
+    update_option('cablecast_custom_taxonomy_definitions', $field_definitions);
+  }
+
   $channels = cablecast_get_resources("$server/cablecastapi/v1/channels", 'channels');
   $live_streams = cablecast_get_resources("$server/cablecastapi/v1/livestreams", 'liveStreams');
   $categories = cablecast_get_resources("$server/cablecastapi/v1/categories", 'categories');
@@ -225,14 +230,33 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     cablecast_upsert_post_meta($id, "cablecast_show_custom_6", $show->custom6);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_7", $show->custom7);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_8", $show->custom8);
+
     if (isset($show->customFields)) {
+      $terms_to_set = [];
+  
       foreach ($show->customFields as $custom_field) {
-        // Look up name of field
-        $show_field = cablecast_extract_id($custom_field->showField, $show_fields);
-        $field_definition = cablecast_extract_id($show_field->fieldDefinition, $field_definitions);
-        cablecast_upsert_post_meta($id,  $field_definition->name, $custom_field->value);
+          // Look up name of field
+          $show_field = cablecast_extract_id($custom_field->showField, $show_fields);
+          $field_definition = cablecast_extract_id($show_field->fieldDefinition, $field_definitions);
+          $tax_name = "cbl-tax-" . $custom_field->showField;
+  
+          if (taxonomy_exists($tax_name)) {
+              if (!isset($terms_to_set[$tax_name])) {
+                  $terms_to_set[$tax_name] = [];
+              }
+              // Append new terms to the taxonomy array
+              $terms_to_set[$tax_name][] = $custom_field->fieldValueString;
+          }
+  
+          cablecast_upsert_post_meta($id, $field_definition->name, $custom_field->value);
       }
-    }
+  
+      // Set all collected terms for each taxonomy
+      foreach ($terms_to_set as $taxonomy => $terms) {
+          // Use array_values to ensure the terms are correctly formatted as an array
+          wp_set_post_terms($id, array_values($terms), $taxonomy);
+      }
+  }
 
     cablecast_upsert_post_meta($id, "cablecast_show_event_date", $show->eventDate);
     cablecast_upsert_post_meta($id, "cablecast_show_location_id", $show->location);
