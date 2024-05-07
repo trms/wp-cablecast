@@ -230,19 +230,6 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     cablecast_upsert_post_meta($id, "cablecast_show_custom_6", $show->custom6);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_7", $show->custom7);
     cablecast_upsert_post_meta($id, "cablecast_show_custom_8", $show->custom8);
-    // if (isset($show->customFields)) {
-    //   foreach ($show->customFields as $custom_field) {
-    //     // Look up name of field
-    //     $show_field = cablecast_extract_id($custom_field->showField, $show_fields);
-    //     $field_definition = cablecast_extract_id($show_field->fieldDefinition, $field_definitions);
-    //     $tax_name = "cbl-tax-" . $custom_field->showField;
-    //     if (taxonomy_exists($tax_name)) {
-    //       wp_set_post_terms( $id, $custom_field->fieldValueString, $tax_name);
-    //     }
-    //     cablecast_upsert_post_meta($id,  $field_definition->name, $custom_field->value);
-    //   }
-    // }
-
 
     if (isset($show->customFields)) {
       $terms_to_set = [];
