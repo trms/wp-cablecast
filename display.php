@@ -62,9 +62,9 @@ function cablecast_content_display($content){
       $channel_id = get_post_meta($post->ID, 'cablecast_channel_id', true);
       $schedule_content = "";
       if (empty($_GET["schedule_date"])) {
-        $date = date("Y-m-d");
+          $date = date("Y-m-d");
       } else {
-        $date = date('Y-m-d', strtotime($_GET["schedule_date"]));
+          $date = date('Y-m-d', strtotime($_GET["schedule_date"]));
       }
       $prev_date = date('Y-m-d', strtotime($date . "-1days"));
       $next_date = date('Y-m-d', strtotime($date . "+1days"));
@@ -75,17 +75,38 @@ function cablecast_content_display($content){
 
       $schedule_content = "<h3>Schedule For $date</h3>";
       $channel_embed_code = get_post_meta($post->ID, 'cablecast_channel_live_embed_code', true);
-      if (empty($channel_embed_code) == false) {
-        $schedule_content .= "<div class=\"wrap\">$channel_embed_code</div>";
+      if (!empty($channel_embed_code)) {
+          $schedule_content .= "<div class=\"wrap\">$channel_embed_code</div>";
       }
       $schedule_content .= "<a href=\"$prev_link\">Previous</a> | <a href=\"$next_link\">Next</a>";
       $schedule_content .= "<table><thead><tr><th>Time</th><th>Show</th></tr></thead><tbody>";
+
+      // Retrieve the timezone string from the WordPress options table
+      $timezone_string = get_option('timezone_string');
+
+      // Check if a valid timezone string is set, otherwise use UTC offset
+      if ($timezone_string) {
+          $timezone = new DateTimeZone($timezone_string);
+      } else {
+          // Get the GMT offset
+          $gmt_offset = get_option('gmt_offset');
+          // Convert the GMT offset to a valid timezone string
+          $timezone = new DateTimeZone('Etc/GMT' . ($gmt_offset >= 0 ? '-' : '+') . abs($gmt_offset));
+      }
+
       foreach($schedule_itmes as $item) {
-        $show_link = get_post_permalink($item->show_post_id);
-        if (empty($show_link)) { continue; }
-        $time = date('h:i a', strtotime($item->run_date_time));
-        $title = $item->show_title;
-        $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\">$item->show_title</a></td></tr>";
+          $show_link = get_post_permalink($item->show_post_id);
+          if (empty($show_link)) { continue; }
+
+          // Create a DateTime object from the run_date_time and set the timezone
+          $date_time = new DateTime($item->run_date_time);
+          $date_time->setTimezone($timezone);
+
+          // Format the date and time
+          $time = $date_time->format('h:i a');
+
+          $title = $item->show_title;
+          $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\">$item->show_title</a></td></tr>";
       }
       $schedule_content .= "</tbody></table>";
       return $schedule_content;
