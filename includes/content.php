@@ -25,7 +25,7 @@ function cablecast_setup_post_types() {
       'capabilities' => array('create_posts' => 'do_not_allow'),
       'map_meta_cap' => true,
       'rewrite' => ['slug' => 'channel'],
-      'has_archive' => 'shows',
+      'has_archive' => 'channels',
       ] );
 }
 add_action( 'init', 'cablecast_setup_post_types' );
