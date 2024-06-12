@@ -21,10 +21,11 @@ function cablecast_setup_post_types() {
         'name' => __('Channels'),
         'singular_name' => __('Channel')
       ],
-      'supports' => array('title', 'custom-fields'),
+      'supports' => array('title', 'custom-fields', 'thumbnail'),
       'capabilities' => array('create_posts' => 'do_not_allow'),
       'map_meta_cap' => true,
-      'rewrite' => ['slug' => 'channel']
+      'rewrite' => ['slug' => 'channel'],
+      'has_archive' => 'shows',
       ] );
 }
 add_action( 'init', 'cablecast_setup_post_types' );
