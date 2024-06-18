@@ -77,14 +77,22 @@ function cablecast_content_display($content){
       if (empty($channel_embed_code) == false) {
         $schedule_content .= "<div class=\"wrap\">$channel_embed_code</div>";
       }
-      
-      $schedule_content .= "
-        <div class=\"schedule-title-container\">
-          <h3>Schedule For $date</h3> 
+
+      $schedule_content .= " 
+        <h3>Schedule For $date</h3> 
+        <div class=\"schedule-title-container\">  
           <div class=\"schedule-prev-next-btns\">
-            <a href=\"$prev_link\" class=\"!text-brand-accent hover:underline\">Previous</a> | <a href=\"$next_link\" class=\"!text-brand-accent hover:underline\">Next</a>
+            <a href=\"$prev_link\" class=\"!text-brand-accent hover:underline\">« Previous Day</a> | <a href=\"$next_link\" class=\"!text-brand-accent hover:underline\">Next Day »</a>
           </div>
-        </div>";
+          <div class=\"\">
+            <form action=\"\">
+              <label for=\"schedule-date\">Choose Date:</label>
+              <input type=\"date\" id=\"schedule-date\" name=\"schedule-date\" value=\"$date\">
+              <input class=\"!text-brand-accent hover:underline\" type=\"submit\">
+            </form>
+          </div>
+        </div>
+      ";
 
       $schedule_content .= "<table><thead><tr><th class=\"schedule-time\">Time</th><th class=\"schedule-show\">Show</th></tr></thead><tbody>";
       foreach($schedule_itmes as $item) {
