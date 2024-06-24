@@ -22,6 +22,9 @@ function cablecast_sync_data() {
   $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&include_deleted=true";
   $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems', TRUE);
 
+  $iana_id = cablecast_get_resources("$server/cablecastapi/v1/systemtime", 'ianaTimeZone');
+
+
   $shows_payload = cablecast_get_shows_payload();
 
   cablecast_sync_channels($channels, $live_streams);
@@ -30,7 +33,7 @@ function cablecast_sync_data() {
   cablecast_sync_categories($categories);
 
   cablecast_sync_shows($shows_payload, $categories, $projects, $producers, $show_fields, $field_definitions);
-  cablecast_sync_schedule($schedule_items);
+  cablecast_sync_schedule($schedule_items, $iana_id);
   cablecast_log( "Finished");
 }
 
@@ -357,32 +360,62 @@ function cablecast_get_schedule_item_by_id($id) {
   return $post;
 }
 
-function cablecast_sync_schedule($scheduleItems) {
+function cablecast_sync_schedule($scheduleItems, $iana_id) {
   global $wpdb;
-  foreach($scheduleItems as $item) {
-    if (!$item->show) { continue; }
+
+  foreach ($scheduleItems as $item) {
+    if (!$item->show) { 
+      error_log("Skipping item with ID " . $item->id . " because it has no show associated.");
+      continue; 
+    }
+
     $table = $wpdb->prefix . 'cablecast_schedule_items';
     $existing_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE schedule_item_id=%d", $item->id));
     $show = cablecast_get_show_post_by_id($item->show);
-    if (!$show) { continue; }
+
+    if (!$show) { 
+      error_log("Skipping item with ID " . $item->id . " because the show could not be found.");
+      continue; 
+    }
+
+    // Convert runDateTime to UTC using the ianaId from publicSiteData
+    try {
+      $datetime = new DateTime($item->runDateTime, new DateTimeZone($iana_id));
+      error_log("Original runDateTime for item ID " . $item->id . ": " . $datetime->format('Y-m-d H:i:s'));
+
+      $datetime->setTimezone(new DateTimeZone('UTC'));
+      $utcDateTime = $datetime->format('Y-m-d H:i:s');
+      error_log("UTC runDateTime for item ID " . $item->id . ": " . $utcDateTime);
+
+      // Log WordPress timezone converted datetime
+      $datetime->setTimezone(new DateTimeZone(get_option('timezone_string')));
+      $wordpressDateTime = $datetime->format('Y-m-d H:i:s');
+      error_log("WordPress runDateTime for item ID " . $item->id . ": " . $wordpressDateTime);
+
+    } catch (Exception $e) {
+      error_log("Error converting datetime for item ID " . $item->id . ": " . $e->getMessage());
+      continue;
+    }
+
     if (empty($existing_row) && $item->deleted == FALSE) {
       $wpdb->insert(
-      	$table,
-        	array(
-        		'run_date_time' => $item->runDateTime,
-        		'show_id' => $item->show,
-            'show_title' => $show->post_title,
-            'show_post_id' => $show->ID,
-            'channel_id' => $item->channel,
-            'channel_post_id' => 0,
-            'schedule_item_id' => $item->id
-        	)
+        $table,
+        array(
+          'run_date_time' => $utcDateTime,
+          'show_id' => $item->show,
+          'show_title' => $show->post_title,
+          'show_post_id' => $show->ID,
+          'channel_id' => $item->channel,
+          'channel_post_id' => 0,
+          'schedule_item_id' => $item->id
+        )
       );
-    } else if ($item->deleted == FALSE){
+      error_log("Inserted new schedule item with ID " . $item->id);
+    } else if ($item->deleted == FALSE) {
       $wpdb->update(
         $table,
         array(
-          'run_date_time' => $item->runDateTime,
+          'run_date_time' => $utcDateTime,
           'show_id' => $item->show,
           'show_title' => $show->post_title,
           'show_post_id' => $show->ID,
@@ -394,6 +427,7 @@ function cablecast_sync_schedule($scheduleItems) {
           'schedule_item_id' => $item->id
         )
       );
+      error_log("Updated schedule item with ID " . $item->id);
     } else {
       $wpdb->delete(
         $table,
@@ -401,9 +435,11 @@ function cablecast_sync_schedule($scheduleItems) {
           'schedule_item_id' => $item->id
         )
       );
+      error_log("Deleted schedule item with ID " . $item->id);
     }
   }
 }
+
 
 function cablecast_sync_categories($categories) {
   foreach ($categories as $category) {
