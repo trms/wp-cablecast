@@ -15,18 +15,20 @@ function cablecast_setup_post_types() {
       'has_archive' => 'shows',
       ] );
 
-    register_post_type( 'cablecast_channel', [
-      'public' => true,
-      'labels' => [
-        'name' => __('Channels'),
-        'singular_name' => __('Channel')
-      ],
-      'supports' => array('title', 'custom-fields', 'thumbnail'),
-      'capabilities' => array('create_posts' => 'do_not_allow'),
-      'map_meta_cap' => true,
-      'rewrite' => ['slug' => 'channel'],
-      'has_archive' => 'channels',
-      ] );
+      register_post_type('cablecast_channel',
+      array(
+          'public' => true,
+          'labels' => array(
+              'name' => __('Channels'),
+              'singular_name' => __('Channel')
+          ),
+          'supports' => array('title', 'custom-fields', 'editor', 'thumbnail'),
+          'capabilities' => array('create_posts' => 'do_not_allow'),
+          'map_meta_cap' => true,
+          'rewrite' => array('slug' => 'channel'),
+          'has_archive' => 'channels',
+      )
+  );
 }
 add_action( 'init', 'cablecast_setup_post_types' );
 
