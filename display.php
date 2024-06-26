@@ -64,46 +64,38 @@ function cablecast_content_display($content){
       if (empty($_GET["schedule_date"])) {
         $date = current_time('Y-m-d');
       } else {
-        $date = date('Y-m-d', strtotime($_GET["schedule_date"]));
-      }
+          $date = date('Y-m-d', strtotime($_GET["schedule_date"]));
+      }    
       $prev_date = date('Y-m-d', strtotime($date . "-1days"));
       $next_date = date('Y-m-d', strtotime($date . "+1days"));
       $prev_link = add_query_arg(array('schedule_date' => $prev_date));
       $next_link = add_query_arg(array('schedule_date' => $next_date));
-      
-      $schedule_itmes = cablecast_get_schedules($channel_id, $date);
+
+      $schedule_items = cablecast_get_schedules($channel_id, $date);
 
       $channel_embed_code = get_post_meta($post->ID, 'cablecast_channel_live_embed_code', true);
       if (empty($channel_embed_code) == false) {
         $schedule_content .= "<div class=\"wrap\">$channel_embed_code</div>";
       }
+      $schedule_content .= "<div class=\"schedule-container\"><div class=\"schedule-date-navigation\"><div><a href=\"$prev_link\" class=\"!text-brand-accent hover:underline\">Previous</a> | <a href=\"$next_link\" class=\"!text-brand-accent hover:underline\">Next</a></div>";
 
-      $schedule_content .= " 
-        <h3>Schedule For $date</h3> 
-        <div class=\"schedule-title-container\">  
-          <div class=\"schedule-prev-next-btns\">
-            <a href=\"$prev_link\" class=\"!text-brand-accent hover:underline\">« Previous Day</a> | <a href=\"$next_link\" class=\"!text-brand-accent hover:underline\">Next Day »</a>
-          </div>
-          <div class=\"\">
-            <form action=\"\">
-              <label for=\"schedule-date\">Choose Date:</label>
-              <input type=\"date\" id=\"schedule-date\" name=\"schedule-date\" value=\"$date\">
-              <input class=\"!text-brand-accent hover:underline\" type=\"submit\">
-            </form>
-          </div>
-        </div>
-      ";
+      $schedule_content .= "<form method=\"get\">";
+      $schedule_content .= "<label for=\"schedule_date\">Select Date:</label>";
+      $schedule_content .= "<input type=\"date\" id=\"schedule_date\" name=\"schedule_date\" value=\"$date\">";
+      $schedule_content .= "<input type=\"submit\" value=\"View Schedule\" class=\"!text-brand-accent hover:underline schedule-date-submit\">";
+      $schedule_content .= "</form></div>";
 
-      $schedule_content .= "<table><thead><tr><th class=\"schedule-time\">Time</th><th class=\"schedule-show\">Show</th></tr></thead><tbody>";
-      foreach($schedule_itmes as $item) {
-        $show_link = get_post_permalink($item->show_post_id);
-        if (empty($show_link)) { continue; }
-        $time = (new DateTime($item->run_date_time, new DateTimeZone($timezone)))
-    ->format('h:i a');
-        $title = $item->show_title;
-        $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\">$item->show_title ($item->run_date_time)</a></td></tr>";
+
+      $schedule_content .= "<table><thead><tr><th class=\"schedule-time\">Time</th><th>Show</th></tr></thead><tbody>";
+      foreach($schedule_items as $item) {
+          $show_link = get_post_permalink($item->show_post_id);
+          if (empty($show_link)) { continue; }
+          $time = date('h:i a', strtotime($item->run_date_time));
+          $title = $item->show_title;
+          $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\">$item->show_title</a></td></tr>";
       }
-      $schedule_content .= "</tbody></table>";
+      $schedule_content .= "</tbody></table></div>";
+
       return $schedule_content;
     } else {
       return $content;
