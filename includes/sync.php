@@ -364,12 +364,14 @@ function cablecast_sync_schedule($scheduleItems) {
     $table = $wpdb->prefix . 'cablecast_schedule_items';
     $existing_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE schedule_item_id=%d", $item->id));
     $show = cablecast_get_show_post_by_id($item->show);
+    $run_date_time = new DateTime($item->runDateTime);
+    $run_date_time->setTimezone(new DateTimeZone('UTC'));
     if (!$show) { continue; }
     if (empty($existing_row) && $item->deleted == FALSE) {
       $wpdb->insert(
       	$table,
         	array(
-        		'run_date_time' => $item->runDateTime,
+        		'run_date_time' => $run_date_time,
         		'show_id' => $item->show,
             'show_title' => $show->post_title,
             'show_post_id' => $show->ID,
@@ -382,7 +384,7 @@ function cablecast_sync_schedule($scheduleItems) {
       $wpdb->update(
         $table,
         array(
-          'run_date_time' => $item->runDateTime,
+          'run_date_time' => $run_date_time,
           'show_id' => $item->show,
           'show_title' => $show->post_title,
           'show_post_id' => $show->ID,
