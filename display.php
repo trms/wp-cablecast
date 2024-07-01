@@ -62,7 +62,7 @@ function cablecast_content_display($content){
       $channel_id = get_post_meta($post->ID, 'cablecast_channel_id', true);
       $schedule_content = "";
       if (empty($_GET["schedule_date"])) {
-        $date = date("Y-m-d");
+        $date = current_time('Y-m-d');
       } else {
         $date = date('Y-m-d', strtotime($_GET["schedule_date"]));
       }
