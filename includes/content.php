@@ -4,6 +4,7 @@ function cablecast_setup_post_types() {
     // register the "book" custom post type
     register_post_type( 'show', [
       'public' => true,
+      'menu_icon' => 'dashicons-video-alt3',
       'labels' => [
         'name' => __('Shows'),
         'singular_name' => __('Show')
@@ -18,6 +19,7 @@ function cablecast_setup_post_types() {
       register_post_type('cablecast_channel',
       array(
           'public' => true,
+          'menu_icon' => 'dashicons-networking',
           'labels' => array(
               'name' => __('Channels'),
               'singular_name' => __('Channel')
