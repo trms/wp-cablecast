@@ -18,17 +18,34 @@ function cablecast_settings_init()
 
     // register a new field in the "cablecast_section_developers" section, inside the "cablecast" page
     add_settings_field(
-        'cablecast_field_server', // as of WP 4.6 this value is used only internally
-        // use $args' label_for to populate the id inside the callback
+        'cablecast_field_server',
         __('Server', 'cablecast'),
         'cablecast_field_server_cb',
         'cablecast',
         'cablecast_section_developers',
         [
-            'label_for'         => 'cablecast_field_server',
-            'class'             => 'cablecast_row',
+            'label_for' => 'cablecast_field_server',
+            'class' => 'cablecast_row',
             'cablecast_custom_data' => 'custom',
         ]
+    );
+
+    // register a new field for the "Clear Schedule" button
+    add_settings_field(
+        'cablecast_clear_schedule',
+        'Clear Schedule', 
+        'cablecast_clear_schedule_cb',
+        'cablecast',
+        'cablecast_section_developers'
+    );
+
+    // register a new field for the "Reset Counters" button
+    add_settings_field(
+        'cablecast_reset_counters',
+        'Reset Counters', 
+        'cablecast_reset_counters_cb',
+        'cablecast',
+        'cablecast_section_developers'
     );
 }
 
@@ -37,45 +54,33 @@ function cablecast_settings_init()
  */
 add_action('admin_init', 'cablecast_settings_init');
 
-/**
- * custom option and settings:
- * callback functions
- */
+function cablecast_section_developers_cb($args) { }
 
-// developers section cb
-
-// section callbacks can accept an $args parameter, which is an array.
-// $args have the following keys defined: title, id, callback.
-// the values are defined at the add_settings_section() function.
-function cablecast_section_developers_cb($args)
-{
-}
-
-// pill field cb
-
-// field callbacks can accept an $args parameter, which is an array.
-// $args is defined at the add_settings_field() function.
-// wordpress has magic interaction with the following keys: label_for, class.
-// the "label_for" key value is used for the "for" attribute of the <label>.
-// the "class" key value is used for the "class" attribute of the <tr> containing the field.
-// you can add custom key value pairs to be used inside your callbacks.
 function cablecast_field_server_cb($args)
 {
-    // get the value of the setting we've registered with register_setting()
     $options = get_option('cablecast_options');
-    // output the field
     ?>
-    <input type="url" name="cablecast_options[server]" class="regular-text code" value="<?= isset($options['server']) ? esc_attr($options['server']) : ''; ?>">
-
-    <?php
+<input type="url" name="cablecast_options[server]" class="regular-text code"
+    value="<?= isset($options['server']) ? esc_attr($options['server']) : ''; ?>">
+<?php
 }
 
-/**
- * top level menu
- */
+function cablecast_clear_schedule_cb()
+{
+    ?>
+<input type="submit" name="clear_schedule" class="button button-secondary" value="Clear">
+<?php
+}
+
+function cablecast_reset_counters_cb()
+{
+    ?>
+<input type="submit" name="reset_counters" class="button button-secondary" value="Reset">
+<?php
+}
+
 function cablecast_options_page()
 {
-    // add top level menu page
     add_menu_page(
         'Cablecast',
         'Cablecast Settings',
@@ -85,15 +90,8 @@ function cablecast_options_page()
     );
 }
 
-/**
- * register our cablecast_options_page to the admin_menu action hook
- */
 add_action('admin_menu', 'cablecast_options_page');
 
-/**
- * top level menu:
- * callback functions
- */
 function cablecast_options_page_html()
 {
     // check user capabilities
@@ -114,14 +112,18 @@ function cablecast_options_page_html()
 
     if (defined('DISABLE_WP_CRON') == false || DISABLE_WP_CRON == false) {
       ?>
-      <div class="notice notice-warning">
-        <p>WordPress's built in cron is still enabled. This causes the cablecast plugin to attempt to sync during regular web requests which can lead to failures and poor user expericnes. It is recomended to disable the built in cron and instead run cron using the system task scheduler. See <a href="https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/">https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/</a> for more info.</p>
-      </div>
-      <?php
+<div class="notice notice-warning">
+    <p>WordPress's built in cron is still enabled. This causes the cablecast plugin to attempt to sync during regular
+        web requests which can lead to failures and poor user expericnes. It is recomended to disable the built in cron
+        and instead run cron using the system task scheduler. See <a
+            href="https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/">https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/</a>
+        for more info.</p>
+</div>
+<?php
     }
 
     ?>
-    <?php
+<?php
       $total = get_option('cablecast_sync_total_result_count');
       $sync_index = get_option('cablecast_sync_index');
       if ($total == FALSE) {
@@ -133,13 +135,14 @@ function cablecast_options_page_html()
       $remaining = $total - $sync_index;
      ?>
 
-    <div class="wrap">
-        <h1><?= esc_html(get_admin_page_title()); ?></h1>
-        <div class="notice notice-info">
-          <p>There are <?= $remaining ?> remaining shows out of  <?= $total ?> shows updated after <?= esc_html(get_option('cablecast_sync_since')); ?></p>
-        </div>
-        <form action="options.php" method="post">
-            <?php
+<div class="wrap">
+    <h1><?= esc_html(get_admin_page_title()); ?></h1>
+    <div class="notice notice-info">
+        <p>There are <?= $remaining ?> remaining shows out of <?= $total ?> shows updated after
+            <?= esc_html(get_option('cablecast_sync_since')); ?></p>
+    </div>
+    <form action="options.php" method="post">
+        <?php
             // output security fields for the registered setting "cablecast"
             settings_fields('cablecast');
             // output setting sections and their fields
@@ -148,7 +151,50 @@ function cablecast_options_page_html()
             // output save settings button
             submit_button('Save Settings');
             ?>
-        </form>
-    </div>
-    <?php
+    </form>
+</div>
+<?php
+}
+
+function cablecast_handle_custom_actions()
+{
+    if (isset($_POST['clear_schedule'])) {
+        cablecast_clear_schedule();
+    }
+
+    if (isset($_POST['reset_counters'])) {
+        cablecast_reset_counters();
+    }
+}
+
+add_action('admin_init', 'cablecast_handle_custom_actions');
+
+function cablecast_clear_schedule() {
+    global $wpdb;
+    
+    $table_name = $wpdb->prefix . 'cablecast_schedule_items';
+    
+    // Attempt to truncate the table
+    $result = $wpdb->query("TRUNCATE TABLE $table_name");
+
+    if ($result !== false) {
+        // Truncation succeeded
+        add_settings_error('cablecast_messages', 'cablecast_message', __('Schedule Cleared', 'cablecast'), 'updated');
+    } else {
+        // Truncation failed
+        add_settings_error('cablecast_messages', 'cablecast_message', __('Failed to clear schedule', 'cablecast'), 'error');
+    }
+
+    // Save any errors for display later
+    settings_errors('cablecast_messages');
+}
+function cablecast_reset_counters()
+{
+    // Reset the specified options
+    update_option('cablecast_sync_since', current_time('mysql'));  // Set to the current date and time
+    update_option('cablecast_sync_total_result_count', 0);
+    update_option('cablecast_sync_index', 0);
+
+    // Add a success message
+    add_settings_error('cablecast_messages', 'cablecast_message', __('Counters Reset', 'cablecast'), 'updated');
 }
