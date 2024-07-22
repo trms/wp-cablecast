@@ -63,7 +63,7 @@ function cablecast_content_display($content){
     $schedule_content = "";
     if (empty($_GET["schedule_date"])) {
       $date = date("Y-m-d");
-      echo "No schedule_date provided. Using today's date: $date<br>";
+      //echo "No schedule_date provided. Using today's date: $date<br>";
     } else {
       $date = date('Y-m-d', strtotime($_GET["schedule_date"]));
       // echo "schedule_date provided: $date<br>";
@@ -79,28 +79,40 @@ function cablecast_content_display($content){
     // echo "Schedule items fetched for $date: ";
     // var_dump($schedule_items);
     
-    $schedule_content = "<h3>Schedule For $date</h3>";
     $channel_embed_code = get_post_meta($post->ID, 'cablecast_channel_live_embed_code', true);
     if (empty($channel_embed_code) == false) {
       $schedule_content .= "<div class=\"wrap\">$channel_embed_code</div>";
     }
-    $schedule_content .= "<div class=\"schedule-container\"><div class=\"schedule-date-navigation\"><div><a href=\"$prev_link\" class=\"!text-brand-accent hover:underline\">Previous</a> | <a href=\"$next_link\" class=\"!text-brand-accent hover:underline\">Next</a></div>";
+    $schedule_content .= "<div class=\"schedule-container\">";
+    $schedule_content .= "<div class=\"schedule-header-container\">";
+    $schedule_content .= "<h3 class=\"heading-text-color\">Schedule for " . date("F j, Y", strtotime($date)) . "</h3>";
+
+    $schedule_content .= "<div class=\"schedule-date-navigation\">";
+    $schedule_content .= "<a href=\"$prev_link\" class=\"!text-brand-accent hover:underline\">« Previous</a>";
 
     $schedule_content .= "<form method=\"get\">";
-    $schedule_content .= "<label for=\"schedule_date\">Select Date:</label>";
-    $schedule_content .= "<input type=\"date\" id=\"schedule_date\" name=\"schedule_date\" value=\"$date\">";
-    $schedule_content .= "<input type=\"submit\" value=\"View Schedule\" class=\"!text-brand-accent hover:underline schedule-date-submit\">";
-    $schedule_content .= "</form></div>";
+    //$schedule_content .= "<label for=\"schedule_date\">Select Date:</label>";
+    $schedule_content .= "<input type=\"date\" id=\"schedule_date\" name=\"schedule_date\" value=\"$date\" onchange=\"this.form.submit()\">";
+    $schedule_content .= "</form>";
 
+    $schedule_content .= "<a href=\"$next_link\" class=\"!text-brand-accent hover:underline schedule-next-btn\">Next »</a>";
+    $schedule_content .= "</div>";
+    $schedule_content .= "</div>";
 
     $schedule_content .= "<table><thead><tr><th class=\"schedule-time\">Time</th><th>Show</th></tr></thead><tbody>";
-    foreach($schedule_items as $item) {
-        $show_link = get_post_permalink($item->show_post_id);
-        if (empty($show_link)) { continue; }
-        $time = date('h:i a', strtotime($item->run_date_time));
-        $title = $item->show_title;
-        $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\">$item->show_title</a></td></tr>";
+
+    if (empty($schedule_items)) {
+      $schedule_content .= "<tr><td colspan=\"2\" class=\"text-center\">No shows scheduled for today. Check out some of our <a href=\"/shows\" class=\"!text-brand-accent hover:underline\">other programming</a> in the meantime!</td></tr>";
+    } else {
+        foreach ($schedule_items as $item) {
+            $show_link = get_post_permalink($item->show_post_id);
+            if (empty($show_link)) { continue; }
+            $time = date('h:i a', strtotime($item->run_date_time));
+            $title = $item->show_title;
+            $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\" class=\"!text-brand-accent hover:underline\">$item->show_title</a></td></tr>";
+        }
     }
+
     $schedule_content .= "</tbody></table></div>";
 
     return $schedule_content;
