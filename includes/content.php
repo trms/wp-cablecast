@@ -114,3 +114,48 @@ function cablecast_register_show_field_taxonomies($definitions) {
       }
   }
 }
+
+// Add taxonomy filters to the custom post type 'show' list in admin
+function add_taxonomy_filters_to_shows() {
+  global $typenow;
+
+  if ($typenow == 'show') {
+      // Add filters for custom taxonomies
+      $taxonomies = ['cablecast_project', 'cablecast_producer']; // Add any other taxonomies if needed
+
+      foreach ($taxonomies as $taxonomy) {
+          $tax = get_taxonomy($taxonomy);
+          $terms = get_terms($taxonomy);
+
+          if ($terms) {
+              echo '<select name="' . $taxonomy . '" id="' . $taxonomy . '" class="postform">';
+              echo '<option value="">' . __('Show All ', 'text_domain') . $tax->label . '</option>';
+
+              foreach ($terms as $term) {
+                  $selected = (isset($_GET[$taxonomy]) && $_GET[$taxonomy] == $term->slug) ? ' selected="selected"' : '';
+                  echo '<option value="' . $term->slug . '"' . $selected . '>' . $term->name . '</option>';
+              }
+
+              echo '</select>';
+          }
+      }
+  }
+}
+add_action('restrict_manage_posts', 'add_taxonomy_filters_to_shows');
+
+// Filter the query by selected taxonomy
+function filter_shows_by_taxonomy($query) {
+  global $pagenow;
+  $post_type = 'show';
+
+  if ($pagenow == 'edit.php' && isset($_GET['post_type']) && $_GET['post_type'] == $post_type) {
+      $taxonomies = ['cablecast_project', 'cablecast_producer']; // Add more taxonomies if needed
+
+      foreach ($taxonomies as $taxonomy) {
+          if (isset($_GET[$taxonomy]) && $_GET[$taxonomy] != '') {
+              $query->query_vars[$taxonomy] = $_GET[$taxonomy];
+          }
+      }
+  }
+}
+add_filter('parse_query', 'filter_shows_by_taxonomy');
