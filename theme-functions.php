@@ -25,7 +25,7 @@ function cablecast_get_schedules($channel_id, $date_start, $date_end = NULL) {
 
   global $wpdb;
   $table = $wpdb->prefix . 'cablecast_schedule_items';
-  $results = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table WHERE channel_id=%d AND run_date_time >= %s AND run_date_time < %s ORDER BY run_date_time",
+  $results = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table WHERE channel_id=%d AND cg_exempt=0 AND run_date_time >= %s AND run_date_time < %s ORDER BY run_date_time",
     $channel_id,
     $date_start_utc,
     $date_end_utc

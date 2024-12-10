@@ -7,7 +7,7 @@ Description: This plugin creates custom post types to store information about sh
 */
 
 global $cablecast_db_version;
-$cablecast_db_version = '1.0';
+$cablecast_db_version = '1.1';
 
 function cablecast_deactivate() {
    $timestamp = wp_next_scheduled( 'cablecast_cron_hook' );
@@ -35,6 +35,7 @@ function cablecast_install() {
       show_post_id int NOT NULL,
       channel_post_id int NOT NULL,
       schedule_item_id int NOT NULL,
+      cg_exempt tinyint(1) DEFAULT 0 NOT NULL,
   		PRIMARY KEY  (id)
   	) $charset_collate;";
 

@@ -366,31 +366,35 @@ function cablecast_sync_schedule($scheduleItems) {
     $show = cablecast_get_show_post_by_id($item->show);
     $run_date_time = new DateTime($item->runDateTime);
     $run_date_time->setTimezone(new DateTimeZone('UTC'));
+    $run_date_time_str = $run_date_time->format('Y-m-d H:i:s'); // Convert DateTime to string
+
     if (!$show) { continue; }
     if (empty($existing_row) && $item->deleted == FALSE) {
       $wpdb->insert(
       	$table,
         	array(
-        		'run_date_time' => $run_date_time,
+        		'run_date_time' => $run_date_time_str,
         		'show_id' => $item->show,
             'show_title' => $show->post_title,
             'show_post_id' => $show->ID,
             'channel_id' => $item->channel,
             'channel_post_id' => 0,
-            'schedule_item_id' => $item->id
+            'schedule_item_id' => $item->id,
+            'cg_exempt' => $item->cgExempt
         	)
       );
     } else if ($item->deleted == FALSE){
       $wpdb->update(
         $table,
         array(
-          'run_date_time' => $run_date_time,
+          'run_date_time' => $run_date_time_str,
           'show_id' => $item->show,
           'show_title' => $show->post_title,
           'show_post_id' => $show->ID,
           'channel_id' => $item->channel,
           'channel_post_id' => 99,
-          'schedule_item_id' => $item->id
+          'schedule_item_id' => $item->id,
+          'cg_exempt' => $item->cgExempt
         ),
         array(
           'schedule_item_id' => $item->id
