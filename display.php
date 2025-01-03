@@ -17,6 +17,7 @@ function cablecast_query_post_type($query) {
 add_filter('the_content','cablecast_content_display');
 function cablecast_content_display($content){
   global $post;
+  $timezone = get_option('timezone_string');
   if ($post->post_type == "show" && in_the_loop() && is_main_query()) {
       $show_meta = get_post_custom($post->ID);
       $vod_url = get_post_meta($post->ID, 'cablecast_vod_url', true);
@@ -107,7 +108,7 @@ function cablecast_content_display($content){
         foreach ($schedule_items as $item) {
             $show_link = get_post_permalink($item->show_post_id);
             if (empty($show_link)) { continue; }
-            $time = date('h:i a', strtotime($item->run_date_time));
+            $time = (new DateTime($item->run_date_time, new DateTimeZone($timezone)))->format('h:i a');
             $title = $item->show_title;
             $schedule_content .= "<tr><td>$time</td><td><a href=\"$show_link\" class=\"!text-brand-accent hover:underline\">$item->show_title</a></td></tr>";
         }
