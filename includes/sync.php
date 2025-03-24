@@ -360,53 +360,61 @@ function cablecast_get_schedule_item_by_id($id) {
 function cablecast_sync_schedule($scheduleItems) {
   global $wpdb;
   foreach($scheduleItems as $item) {
-    if (!$item->show) { continue; }
-    $table = $wpdb->prefix . 'cablecast_schedule_items';
-    $existing_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE schedule_item_id=%d", $item->id));
-    $show = cablecast_get_show_post_by_id($item->show);
-    $run_date_time = new DateTime($item->runDateTime);
-    $run_date_time->setTimezone(new DateTimeZone('UTC'));
-    $run_date_time_str = $run_date_time->format('Y-m-d H:i:s'); // Convert DateTime to string
+    try {
+      if (!$item->show) { continue; }
+      $table = $wpdb->prefix . 'cablecast_schedule_items';
+      $existing_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE schedule_item_id=%d", $item->id));
+      $show = cablecast_get_show_post_by_id($item->show);
+      $run_date_time = new DateTime($item->runDateTime);
+      $run_date_time->setTimezone(new DateTimeZone('UTC'));
+      $run_date_time_str = $run_date_time->format('Y-m-d H:i:s'); // Convert DateTime to string
 
-    if (!$show) { continue; }
-    if (empty($existing_row) && $item->deleted == FALSE) {
-      $wpdb->insert(
-      	$table,
-        	array(
-        		'run_date_time' => $run_date_time_str,
-        		'show_id' => $item->show,
+      if (!$show) { continue; }
+      if (empty($existing_row) && $item->deleted == FALSE) {
+        cablecast_log("[Cablecast Schedule] NEW schedule item: $item->id, showid: $item->show at  $run_date_time_str on $item->channel" );
+        $wpdb->insert(
+          $table,
+            array(
+              'run_date_time' => $run_date_time_str,
+              'show_id' => $item->show,
+              'show_title' => $show->post_title,
+              'show_post_id' => $show->ID,
+              'channel_id' => $item->channel,
+              'channel_post_id' => 0,
+              'schedule_item_id' => $item->id,
+              'cg_exempt' => $item->cgExempt
+            )
+        );
+      } else if ($item->deleted == FALSE){
+        cablecast_log("[Cablecast Schedule] UPDATE schedule item: $item->id, showid: $item->show at  $run_date_time_str on $item->channel" );
+        $wpdb->update(
+          $table,
+          array(
+            'run_date_time' => $run_date_time_str,
+            'show_id' => $item->show,
             'show_title' => $show->post_title,
             'show_post_id' => $show->ID,
             'channel_id' => $item->channel,
-            'channel_post_id' => 0,
+            'channel_post_id' => 99,
             'schedule_item_id' => $item->id,
             'cg_exempt' => $item->cgExempt
-        	)
-      );
-    } else if ($item->deleted == FALSE){
-      $wpdb->update(
-        $table,
-        array(
-          'run_date_time' => $run_date_time_str,
-          'show_id' => $item->show,
-          'show_title' => $show->post_title,
-          'show_post_id' => $show->ID,
-          'channel_id' => $item->channel,
-          'channel_post_id' => 99,
-          'schedule_item_id' => $item->id,
-          'cg_exempt' => $item->cgExempt
-        ),
-        array(
-          'schedule_item_id' => $item->id
-        )
-      );
-    } else {
-      $wpdb->delete(
-        $table,
-        array(
-          'schedule_item_id' => $item->id
-        )
-      );
+          ),
+          array(
+            'schedule_item_id' => $item->id
+          )
+        );
+      } else {
+        cablecast_log("[Cablecast Schedule] DELETE schedule item: $item->id, showid: $item->show at  $run_date_time_str on $item->channel" );
+        $wpdb->delete(
+          $table,
+          array(
+            'schedule_item_id' => $item->id
+          )
+        );
+      }
+    }
+    catch (Exception $e) {
+      cablecast_log("[Cablecast Schedule] Error processing schedule item: $item->id, showid: $item->show at  $run_date_time_str on $item->channel Error: $e" );
     }
   }
 }
