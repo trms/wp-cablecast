@@ -18,9 +18,10 @@ function cablecast_sync_data() {
   $show_fields = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'showFields');
   $field_definitions = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'fieldDefinitions');
 
-  $two_days_ago = date('Y-m-d', strtotime("-2days"));
-  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$two_days_ago&include_deleted=true";
-  $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems', TRUE);
+  $today = date('Y-m-d', strtotime("now"));
+  $two_weeks_from_now = date('Y-m-d', strtotime('+2 weeks'));
+  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$today&end=$two_weeks_from_now&include_cg_exempt=false&page_size=2000";
+  $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems');
 
   $shows_payload = cablecast_get_shows_payload();
 
@@ -35,6 +36,7 @@ function cablecast_sync_data() {
 }
 
 function cablecast_get_shows_payload() {
+  $batch_size = 25;
   $options = get_option('cablecast_options');
   $since = get_option('cablecast_sync_since');
   if ($since == FALSE) {
@@ -62,13 +64,21 @@ function cablecast_get_shows_payload() {
   $result = json_decode($result);
 
 
+
   $total_result_count = count($result->savedShowSearch->results);
   if ($total_result_count <= $sync_index) {
     $sync_index = 0;
     update_option('cablecast_sync_index', $sync_index);
   }
 
-  $ids = array_slice($result->savedShowSearch->results, $sync_index, 100);
+  if ($total_result_count == 0) {
+    cablecast_log("No shows to sync");
+    $response = new stdClass();
+    $response->shows = [];
+    return $response;
+  }
+
+  $ids = array_slice($result->savedShowSearch->results, $sync_index, $batch_size);
   $processing_result_count = count($ids);
   $end_index = $sync_index + $processing_result_count;
 
@@ -80,7 +90,7 @@ function cablecast_get_shows_payload() {
     $id_query .= "&ids[]=$id";
   }
 
-  $url = "$server/cablecastapi/v1/shows?page_size=100&include=reel,vod,webfile$id_query";
+  $url = "$server/cablecastapi/v1/shows?page_size=$batch_size&include=reel,vod,webfile$id_query";
   cablecast_log("Retreving shows from using: $url");
 
   $shows_json = file_get_contents($url);
@@ -357,61 +367,153 @@ function cablecast_get_schedule_item_by_id($id) {
   return $post;
 }
 
+/**
+ * Sync Cablecast schedule items into WP DB with global pruning:
+ * After syncing, delete any rows whose schedule_item_id isn't in the payload (global scope).
+ *
+ * @param array|object $scheduleItems
+ * @return bool True if work ran (hash changed or no prior hash), false if skipped.
+ */
 function cablecast_sync_schedule($scheduleItems) {
   global $wpdb;
-  foreach($scheduleItems as $item) {
-    if (!$item->show) { continue; }
-    $table = $wpdb->prefix . 'cablecast_schedule_items';
-    $existing_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE schedule_item_id=%d", $item->id));
-    $show = cablecast_get_show_post_by_id($item->show);
-    $run_date_time = new DateTime($item->runDateTime);
-    $run_date_time->setTimezone(new DateTimeZone('UTC'));
-    $run_date_time_str = $run_date_time->format('Y-m-d H:i:s'); // Convert DateTime to string
 
+  // ---- Early-exit guard: compare payload hashes ----
+  $payload_json = wp_json_encode($scheduleItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $new_hash     = md5($payload_json);
+  $option_key   = 'cablecast_schedule_items_hash';
+
+  $prev_hash = get_option($option_key, '');
+  if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
+    cablecast_log("Schedule items unchanged; skipping DB sync.");
+    return false; // unchanged payload; skip DB work
+  }
+
+  $table = $wpdb->prefix . 'cablecast_schedule_items';
+
+  // Collect *all* schedule_item_ids from the payload to use for global pruning
+  $all_payload_ids = [];
+
+  foreach ($scheduleItems as $item) {
+    if (!$item->show) { continue; }
+
+    $schedule_item_id = (int)$item->id;
+    $all_payload_ids[] = $schedule_item_id;
+
+    $is_deleted = isset($item->deleted) ? (bool)$item->deleted : false;
+
+    // Lookup existing row
+    $existing_row = $wpdb->get_row(
+      $wpdb->prepare("SELECT * FROM {$table} WHERE schedule_item_id = %d", $schedule_item_id)
+    );
+
+    // Map show post
+    $show = cablecast_get_show_post_by_id($item->show);
     if (!$show) { continue; }
-    if (empty($existing_row) && $item->deleted == FALSE) {
+
+    // Normalize time to UTC
+    try {
+      $run_date_time = new DateTime($item->runDateTime);
+      $run_date_time->setTimezone(new DateTimeZone('UTC'));
+      $run_date_time_str = $run_date_time->format('Y-m-d H:i:s');
+    } catch (Exception $e) {
+      continue; // skip bad datetime
+    }
+
+    if (empty($existing_row) && $is_deleted === false) {
+      // Insert
       $wpdb->insert(
-      	$table,
-        	array(
-        		'run_date_time' => $run_date_time_str,
-        		'show_id' => $item->show,
-            'show_title' => $show->post_title,
-            'show_post_id' => $show->ID,
-            'channel_id' => $item->channel,
-            'channel_post_id' => 0,
-            'schedule_item_id' => $item->id,
-            'cg_exempt' => $item->cgExempt
-        	)
+        $table,
+        array(
+          'run_date_time'    => $run_date_time_str,
+          'show_id'          => (int)$item->show,
+          'show_title'       => $show->post_title,
+          'show_post_id'     => (int)$show->ID,
+          'channel_id'       => (int)$item->channel,
+          'channel_post_id'  => 0,
+          'schedule_item_id' => $schedule_item_id,
+          'cg_exempt'        => (int)!empty($item->cgExempt),
+        ),
+        array('%s','%d','%s','%d','%d','%d','%d','%d')
       );
-    } else if ($item->deleted == FALSE){
+    } else if ($is_deleted === false) {
+      // Update
       $wpdb->update(
         $table,
         array(
-          'run_date_time' => $run_date_time_str,
-          'show_id' => $item->show,
-          'show_title' => $show->post_title,
-          'show_post_id' => $show->ID,
-          'channel_id' => $item->channel,
-          'channel_post_id' => 99,
-          'schedule_item_id' => $item->id,
-          'cg_exempt' => $item->cgExempt
+          'run_date_time'    => $run_date_time_str,
+          'show_id'          => (int)$item->show,
+          'show_title'       => $show->post_title,
+          'show_post_id'     => (int)$show->ID,
+          'channel_id'       => (int)$item->channel,
+          'channel_post_id'  => 99,
+          'schedule_item_id' => $schedule_item_id,
+          'cg_exempt'        => (int)!empty($item->cgExempt),
         ),
-        array(
-          'schedule_item_id' => $item->id
-        )
+        array('schedule_item_id' => $schedule_item_id),
+        array('%s','%d','%s','%d','%d','%d','%d','%d'),
+        array('%d')
       );
     } else {
-      $wpdb->delete(
-        $table,
-        array(
-          'schedule_item_id' => $item->id
-        )
-      );
+      // Delete (explicitly flagged as deleted from remote)
+      $wpdb->delete($table, array('schedule_item_id' => $schedule_item_id), array('%d'));
     }
   }
+
+  // ---- Global prune: delete any DB rows not in the payload ----
+  // Deduplicate incoming IDs
+  $all_payload_ids = array_values(array_unique(array_map('intval', $all_payload_ids)));
+
+  if (empty($all_payload_ids)) {
+    // If the payload is empty and represents the complete dataset, wipe the table.
+    // (This matches your requirement: delete any id not in the change set — here that's "all".)
+    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+    $wpdb->query("DELETE FROM {$table}");
+  } else {
+    // Get current IDs from DB
+    $existing_ids = $wpdb->get_col("SELECT schedule_item_id FROM {$table}");
+    $existing_ids = array_map('intval', $existing_ids);
+
+    // Compute rows to delete
+    $to_delete = array_values(array_diff($existing_ids, $all_payload_ids));
+
+    // Delete in chunks to keep placeholder lists reasonable
+    $chunk_size = 500;
+    for ($i = 0; $i < count($to_delete); $i += $chunk_size) {
+      $chunk = array_slice($to_delete, $i, $chunk_size);
+      if (empty($chunk)) { continue; }
+
+      $placeholders = implode(',', array_fill(0, count($chunk), '%d'));
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+      $sql = $wpdb->prepare(
+        "DELETE FROM {$table} WHERE schedule_item_id IN ($placeholders)",
+        $chunk
+      );
+      $wpdb->query($sql);
+    }
+  }
+
+  // ---- Persist the new hash after successful processing ----
+  if ($prev_hash === '') {
+    add_option($option_key, $new_hash, '', 'no');
+  } else {
+    update_option($option_key, $new_hash, 'no');
+  }
+
+  return true;
 }
 
 function cablecast_sync_categories($categories) {
+  // ---- Early-exit guard: compare payload hashes ----
+  $payload_json = wp_json_encode($categories, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $new_hash     = md5($payload_json);
+  $option_key   = 'cablecast_categories_items_hash';
+
+  $prev_hash = get_option($option_key, '');
+  if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
+    cablecast_log("Category items unchanged; skipping DB sync.");
+    return false; // unchanged payload; skip DB work
+  }
+
   foreach ($categories as $category) {
     $term = term_exists( $category->name, 'category' ); // array is returned if taxonomy is given
     if ($term == NULL) {
@@ -421,9 +523,28 @@ function cablecast_sync_categories($categories) {
       );
     }
   }
+
+  // ---- Persist the new hash after successful processing ----
+  if ($prev_hash === '') {
+    add_option($option_key, $new_hash, '', 'no');
+  } else {
+    update_option($option_key, $new_hash, 'no');
+  }
 }
 
 function cablecast_sync_projects($projects) {
+  // ---- Early-exit guard: compare payload hashes ----
+  $payload_json = wp_json_encode($projects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $new_hash     = md5($payload_json);
+  $option_key   = 'cablecast_projects_items_hash';
+
+  $prev_hash = get_option($option_key, '');
+  if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
+    cablecast_log("Project items unchanged; skipping DB sync.");
+    return false; // unchanged payload; skip DB work
+  }
+
+
   foreach ($projects as $project) {
     $processed = cablecast_replace_commas_in_tag($project->name);
     $term = term_exists( $processed, 'cablecast_project' ); // array is returned if taxonomy is given
@@ -441,9 +562,27 @@ function cablecast_sync_projects($projects) {
       ));
     }
   }
+
+  // ---- Persist the new hash after successful processing ----
+  if ($prev_hash === '') {
+    add_option($option_key, $new_hash, '', 'no');
+  } else {
+    update_option($option_key, $new_hash, 'no');
+  }
 }
 
 function cablecast_sync_producers($producers) {
+  // ---- Early-exit guard: compare payload hashes ----
+  $payload_json = wp_json_encode($producers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $new_hash     = md5($payload_json);
+  $option_key   = 'cablecast_producers_items_hash';
+
+  $prev_hash = get_option($option_key, '');
+  if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
+    cablecast_log("Producer items unchanged; skipping DB sync.");
+    return false; // unchanged payload; skip DB work
+  }
+  
   foreach ($producers as $producer) {
     $processed = cablecast_replace_commas_in_tag($producer->name);
     if (empty($processed)) { return; }
@@ -467,6 +606,13 @@ function cablecast_sync_producers($producers) {
     cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_phone_one', $producer->phoneOne);
     cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_phone_two', $producer->phoneTwo);
     cablecast_upsert_term_meta($term['term_id'], 'cablecast_producer_website', $producer->website);
+  }
+
+  // ---- Persist the new hash after successful processing ----
+  if ($prev_hash === '') {
+    add_option($option_key, $new_hash, '', 'no');
+  } else {
+    update_option($option_key, $new_hash, 'no');
   }
 }
 
@@ -578,5 +724,6 @@ function cablecast_upsert_term_meta($id, $name, $value) {
 }
 
 function cablecast_log ($message) {
+  echo "[Cablecast] $message \n";
   error_log("[Cablecast] $message");
 }
