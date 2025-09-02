@@ -17,7 +17,7 @@ function cablecast_query_post_type($query) {
 add_filter('the_content','cablecast_content_display');
 function cablecast_content_display($content){
     global $post;
-    if ($post->post_type == "show" && in_the_loop() && is_main_query()) {
+    if ($post != null && $post->post_type == "show" && in_the_loop() && is_main_query()) {
         $show_meta = get_post_custom($post->ID);
         $vod_url = get_post_meta($post->ID, 'cablecast_vod_url', true);
         $producer = get_post_meta($post->ID, 'cablecast_producer_name', true);
@@ -58,7 +58,7 @@ function cablecast_content_display($content){
           $show_content .= "</div>";
         }
         return do_shortcode($show_content);
-    } else if ($post->post_type == 'cablecast_channel' && is_single() && in_the_loop() && is_main_query()) {
+    } else if ($post != null && $post->post_type == 'cablecast_channel' && is_single() && in_the_loop() && is_main_query()) {
       $channel_id = get_post_meta($post->ID, 'cablecast_channel_id', true);
       $schedule_content = "";
       if (empty($_GET["schedule_date"])) {
