@@ -10,6 +10,15 @@ class SyncThumbnailTest extends WP_UnitTestCase {
      */
     public function setUp(): void {
         parent::setUp();
+
+        // Ensure the 'show' post type is registered
+        if (!post_type_exists('show')) {
+            register_post_type('show', [
+                'public' => true,
+                'supports' => ['title', 'editor', 'thumbnail'],
+            ]);
+        }
+
         delete_option('cablecast_options');
         delete_option('cablecast_sync_total_result_count');
         delete_option('cablecast_sync_index');
@@ -50,6 +59,14 @@ class SyncThumbnailTest extends WP_UnitTestCase {
             'thumbnailImage' => (object)[
                 'url' => 'https://example.cablecast.net/cablecastapi/dynamicthumbnails/99999'
             ],
+            'custom1' => '',
+            'custom2' => '',
+            'custom3' => '',
+            'custom4' => '',
+            'custom5' => '',
+            'custom6' => '',
+            'custom7' => '',
+            'custom8' => '',
         ];
 
         $show = (object) array_merge($default, $show_data);
@@ -191,6 +208,14 @@ class SyncThumbnailTest extends WP_UnitTestCase {
                 'comments' => '',
                 'lastModified' => '2024-01-01T12:00:00',
                 'reels' => [],
+                'custom1' => '',
+                'custom2' => '',
+                'custom3' => '',
+                'custom4' => '',
+                'custom5' => '',
+                'custom6' => '',
+                'custom7' => '',
+                'custom8' => '',
             ]],
             'vods' => [],
             'reels' => [],

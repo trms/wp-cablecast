@@ -13,6 +13,14 @@ class ThumbnailUrlTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
 
+        // Ensure the 'show' post type is registered
+        if (!post_type_exists('show')) {
+            register_post_type('show', [
+                'public' => true,
+                'supports' => ['title', 'editor', 'thumbnail'],
+            ]);
+        }
+
         // Create a test show post
         $this->show_post_id = wp_insert_post([
             'post_title' => 'Test Show',

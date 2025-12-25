@@ -14,6 +14,14 @@ class ThumbnailCleanupTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
 
+        // Ensure the 'show' post type is registered
+        if (!post_type_exists('show')) {
+            register_post_type('show', [
+                'public' => true,
+                'supports' => ['title', 'editor', 'thumbnail'],
+            ]);
+        }
+
         // Create test show posts with featured images
         for ($i = 0; $i < 5; $i++) {
             $show_id = wp_insert_post([
@@ -28,11 +36,12 @@ class ThumbnailCleanupTest extends WP_UnitTestCase {
                 'post_title' => "Thumbnail {$i}",
                 'post_type' => 'attachment',
                 'post_mime_type' => 'image/jpeg',
+                'post_status' => 'inherit',
             ]);
             $this->attachment_ids[] = $attachment_id;
 
-            // Set as featured image
-            set_post_thumbnail($show_id, $attachment_id);
+            // Set as featured image using direct meta update for reliability in tests
+            update_post_meta($show_id, '_thumbnail_id', $attachment_id);
         }
     }
 
