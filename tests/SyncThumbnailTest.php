@@ -67,6 +67,7 @@ class SyncThumbnailTest extends WP_UnitTestCase {
             'custom6' => '',
             'custom7' => '',
             'custom8' => '',
+            'location' => null,
         ];
 
         $show = (object) array_merge($default, $show_data);
@@ -216,6 +217,7 @@ class SyncThumbnailTest extends WP_UnitTestCase {
                 'custom6' => '',
                 'custom7' => '',
                 'custom8' => '',
+                'location' => null,
             ]],
             'vods' => [],
             'reels' => [],

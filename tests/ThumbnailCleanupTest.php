@@ -128,7 +128,10 @@ class ThumbnailCleanupTest extends WP_UnitTestCase {
             'delete_local_thumbnails' => true,
         ]);
 
-        // Run cleanup
+        // Run cleanup - first call deletes thumbnails
+        cablecast_cleanup_local_thumbnails();
+
+        // Run cleanup again - second call finds no more posts and clears the flag
         cablecast_cleanup_local_thumbnails();
 
         // Flag should be cleared
