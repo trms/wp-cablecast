@@ -5,9 +5,14 @@ function cablecast_sync_data() {
   $server = $options["server"];
   cablecast_log ("Syncing data for $server");
 
-  $field_definitions = json_decode(file_get_contents("$server/cablecastapi/v1/showfields"));
-  if (isset($field_definitions->fieldDefinitions) && isset($field_definitions->showFields)) {
-    update_option('cablecast_custom_taxonomy_definitions', $field_definitions);
+  $field_response = wp_remote_get("$server/cablecastapi/v1/showfields", array('timeout' => 30));
+  if (!is_wp_error($field_response) && wp_remote_retrieve_response_code($field_response) === 200) {
+    $field_definitions = json_decode(wp_remote_retrieve_body($field_response));
+    if (isset($field_definitions->fieldDefinitions) && isset($field_definitions->showFields)) {
+      update_option('cablecast_custom_taxonomy_definitions', $field_definitions);
+    }
+  } else {
+    \Cablecast\Logger::log('error', 'Failed to fetch show field definitions from API');
   }
 
   $channels = cablecast_get_resources("$server/cablecastapi/v1/channels", 'channels');
@@ -51,19 +56,34 @@ function cablecast_get_shows_payload() {
 
   $json_search = "{\"savedShowSearch\":{\"query\":{\"groups\":[{\"orAnd\":\"and\",\"filters\":[{\"field\":\"lastModified\",\"operator\":\"greaterThan\",\"searchValue\":\"$since\"}]}],\"sortOptions\":[{\"field\":\"lastModified\",\"descending\":false},{\"field\":\"title\",\"descending\":false}]},\"name\":\"\"}}";
 
-  $opts = array('http' =>
-      array(
-          'method'  => 'POST',
-          'header'  => 'Content-Type: application/json',
-          'content' => $json_search,
-          'ignore_errors' => true
-      )
-  );
-  $context = stream_context_create($opts);
-  $result = file_get_contents("$server/cablecastapi/v1/shows/search/advanced", false, $context);
-  $result = json_decode($result);
+  // Use wp_remote_post instead of file_get_contents for proper timeout handling
+  $search_response = wp_remote_post("$server/cablecastapi/v1/shows/search/advanced", array(
+    'timeout' => 30,
+    'headers' => array('Content-Type' => 'application/json'),
+    'body' => $json_search,
+  ));
 
+  if (is_wp_error($search_response)) {
+    \Cablecast\Logger::log('error', 'Failed to search shows: ' . $search_response->get_error_message());
+    $response = new stdClass();
+    $response->shows = [];
+    return $response;
+  }
 
+  if (wp_remote_retrieve_response_code($search_response) !== 200) {
+    \Cablecast\Logger::log('error', 'Show search API returned status: ' . wp_remote_retrieve_response_code($search_response));
+    $response = new stdClass();
+    $response->shows = [];
+    return $response;
+  }
+
+  $result = json_decode(wp_remote_retrieve_body($search_response));
+  if (!$result || !isset($result->savedShowSearch->results)) {
+    \Cablecast\Logger::log('error', 'Invalid JSON response from show search API');
+    $response = new stdClass();
+    $response->shows = [];
+    return $response;
+  }
 
   $total_result_count = count($result->savedShowSearch->results);
   if ($total_result_count <= $sync_index) {
@@ -93,8 +113,30 @@ function cablecast_get_shows_payload() {
   $url = "$server/cablecastapi/v1/shows?page_size=$batch_size&include=reel,vod,webfile,thumbnail$id_query";
   cablecast_log("Retreving shows from using: $url");
 
-  $shows_json = file_get_contents($url);
-  $shows_payload = json_decode($shows_json);
+  // Use wp_remote_get instead of file_get_contents for proper timeout handling
+  $shows_response = wp_remote_get($url, array('timeout' => 30));
+
+  if (is_wp_error($shows_response)) {
+    \Cablecast\Logger::log('error', 'Failed to fetch shows: ' . $shows_response->get_error_message());
+    $response = new stdClass();
+    $response->shows = [];
+    return $response;
+  }
+
+  if (wp_remote_retrieve_response_code($shows_response) !== 200) {
+    \Cablecast\Logger::log('error', 'Shows API returned status: ' . wp_remote_retrieve_response_code($shows_response));
+    $response = new stdClass();
+    $response->shows = [];
+    return $response;
+  }
+
+  $shows_payload = json_decode(wp_remote_retrieve_body($shows_response));
+  if (!$shows_payload) {
+    \Cablecast\Logger::log('error', 'Invalid JSON response from shows API');
+    $response = new stdClass();
+    $response->shows = [];
+    return $response;
+  }
 
   return $shows_payload;
 }
@@ -110,18 +152,49 @@ function cablecast_get_resources($url, $key, $ensure_all_loaded = FALSE) {
     }
 
     cablecast_log("Retreiving $key from $paged_url");
-    $result = json_decode(file_get_contents($paged_url));
 
-    if ($ensure_all_loaded && $result->meta->count > $result->meta->pageSize) {
+    // Use wp_remote_get instead of file_get_contents for proper timeout handling
+    $response = wp_remote_get($paged_url, array('timeout' => 30));
+
+    if (is_wp_error($response)) {
+      \Cablecast\Logger::log('error', "Failed to fetch $key: " . $response->get_error_message());
+      return $resources;
+    }
+
+    if (wp_remote_retrieve_response_code($response) !== 200) {
+      \Cablecast\Logger::log('error', "API returned status " . wp_remote_retrieve_response_code($response) . " for $key");
+      return $resources;
+    }
+
+    $result = json_decode(wp_remote_retrieve_body($response));
+    if (!$result) {
+      \Cablecast\Logger::log('error', "Invalid JSON response for $key");
+      return $resources;
+    }
+
+    if ($ensure_all_loaded && isset($result->meta) && $result->meta->count > $result->meta->pageSize) {
       cablecast_log("Not enough schedule items loaded. Increase page size");
       $page_size = $result->meta->count + 10;
       $paged_url = "$url&page_size=$page_size";
       cablecast_log("Retreiving $key from $paged_url");
-      $result = json_decode(file_get_contents($paged_url));
+
+      $response = wp_remote_get($paged_url, array('timeout' => 60)); // longer timeout for large payloads
+      if (is_wp_error($response)) {
+        \Cablecast\Logger::log('error', "Failed to fetch $key (expanded): " . $response->get_error_message());
+        return $resources;
+      }
+      if (wp_remote_retrieve_response_code($response) !== 200) {
+        \Cablecast\Logger::log('error', "API returned status " . wp_remote_retrieve_response_code($response) . " for $key (expanded)");
+        return $resources;
+      }
+      $result = json_decode(wp_remote_retrieve_body($response));
     }
-    $resources = $result->$key;
+
+    if (isset($result->$key)) {
+      $resources = $result->$key;
+    }
   } catch (Exception $e) {
-    cablecast_log("Error retreiving \"$key\"" . $e->message);
+    \Cablecast\Logger::log('error', "Error retreiving \"$key\": " . $e->getMessage());
   }
   return $resources;
 }
@@ -270,15 +343,27 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     if ($thumbnail_mode === 'local') {
       // Original behavior - download thumbnails as WordPress attachments
       if (isset($show->thumbnailImage) && isset($show->thumbnailImage->url)) {
-        $thumbnail_id = cablecast_insert_attachment_from_url($show->thumbnailImage->url, $id, true);
-        if ($thumbnail_id) {
-          set_post_thumbnail($id, $thumbnail_id);
+        // Validate URL before downloading
+        $thumbnail_url = esc_url_raw($show->thumbnailImage->url);
+        if (wp_http_validate_url($thumbnail_url)) {
+          $thumbnail_id = cablecast_insert_attachment_from_url($thumbnail_url, $id, true);
+          if ($thumbnail_id) {
+            set_post_thumbnail($id, $thumbnail_id);
+          }
+        } else {
+          \Cablecast\Logger::log('warning', "Invalid thumbnail URL for show $show->id: " . $show->thumbnailImage->url);
         }
       }
     } else {
       // Remote hosting - save URL to meta for CDN-based display
       if (isset($show->thumbnailImage) && isset($show->thumbnailImage->url)) {
-        cablecast_upsert_post_meta($id, "cablecast_thumbnail_url", $show->thumbnailImage->url);
+        // Validate URL before saving to prevent storing malicious URLs
+        $thumbnail_url = esc_url_raw($show->thumbnailImage->url);
+        if (wp_http_validate_url($thumbnail_url)) {
+          cablecast_upsert_post_meta($id, "cablecast_thumbnail_url", $thumbnail_url);
+        } else {
+          \Cablecast\Logger::log('warning', "Invalid thumbnail URL for show $show->id: " . $show->thumbnailImage->url);
+        }
       }
     }
 
