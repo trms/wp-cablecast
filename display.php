@@ -24,9 +24,9 @@ function cablecast_content_display($content){
         $category = get_post_meta($post->ID, 'cablecast_category_name', true);
         $project = get_post_meta($post->ID, 'cablecast_project_name', true);
         $trt = get_post_meta($post->ID, 'cablecast_show_trt', true);
+        $vod_poster = get_the_post_thumbnail_url();
         $show_content =  "<div>";
         if (is_single()) {
-          $vod_poster = get_the_post_thumbnail_url();
           $show_content .= "[video src=\"$vod_url\" poster=\"$vod_poster\" autoplay=\"true\"]";
         }
         $show_content .= "<p>";
@@ -53,6 +53,12 @@ function cablecast_content_display($content){
             $category_link = get_term_link($category, 'category');
             $show_content .= "<li>Category: ";
             $show_content .= "<a href=\"$category_link\">$category</a></li>";
+          }
+          if (empty($vod_poster) == false) {
+            $show_content .= "<li>Poster: ";
+            $show_content .= "<img src=\"$vod_poster\" alt=\"Poster for $post->post_title\"></li>";
+          } else {
+            $show_content .= "<li>No Poster</li>";
           }
           $show_content .= "</ul>";
           $show_content .= "</div>";

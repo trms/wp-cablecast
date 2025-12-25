@@ -36,7 +36,7 @@ function cablecast_sync_data() {
 }
 
 function cablecast_get_shows_payload() {
-  $batch_size = 25;
+  $batch_size = 100;
   $options = get_option('cablecast_options');
   $since = get_option('cablecast_sync_since');
   if ($since == FALSE) {
@@ -90,7 +90,7 @@ function cablecast_get_shows_payload() {
     $id_query .= "&ids[]=$id";
   }
 
-  $url = "$server/cablecastapi/v1/shows?page_size=$batch_size&include=reel,vod,webfile$id_query";
+  $url = "$server/cablecastapi/v1/shows?page_size=$batch_size&include=reel,vod,webfile,thumbnail$id_query";
   cablecast_log("Retreving shows from using: $url");
 
   $shows_json = file_get_contents($url);
@@ -132,6 +132,10 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
   if ($sync_index == FALSE) {
     $sync_index = 0;
   }
+
+  // Get thumbnail mode setting
+  $options = get_option('cablecast_options');
+  $thumbnail_mode = isset($options['thumbnail_mode']) ? $options['thumbnail_mode'] : 'local';
 
   foreach($shows_payload->shows as $show) {
     cablecast_log ("Syncing Show: ($show->id) $show->title");
@@ -177,19 +181,6 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
     }
 
     $id = $post->ID;
-
-    if (isset($show->thumbnailImage) && isset($show->thumbnailImage->url)) {
-      $thumbnail_id = cablecast_insert_attachment_from_url($show->thumbnailImage->url, $id, true);
-      set_post_thumbnail( $id, $thumbnail_id );
-    }
-
-    if (isset($show->showThumbnailOriginal)) {
-      $webFile = cablecast_extract_id($show->showThumbnailOriginal, $shows_payload->webFiles);
-      if ($webFile != NULL) {
-        $thumbnail_id = cablecast_insert_attachment_from_url($webFile->url, $id);
-        set_post_thumbnail( $id, $thumbnail_id );
-      }
-    }
 
     if (isset($show->vods) && count($show->vods)) {
       $vod = cablecast_extract_id($show->vods[0], $shows_payload->vods);
@@ -274,6 +265,22 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
 
     $trt = cablecast_calculate_trt($show, $shows_payload->reels);
     cablecast_upsert_post_meta($id, "cablecast_show_trt", $trt);
+
+    // Handle thumbnails based on mode setting
+    if ($thumbnail_mode === 'local') {
+      // Original behavior - download thumbnails as WordPress attachments
+      if (isset($show->thumbnailImage) && isset($show->thumbnailImage->url)) {
+        $thumbnail_id = cablecast_insert_attachment_from_url($show->thumbnailImage->url, $id, true);
+        if ($thumbnail_id) {
+          set_post_thumbnail($id, $thumbnail_id);
+        }
+      }
+    } else {
+      // Remote hosting - save URL to meta for CDN-based display
+      if (isset($show->thumbnailImage) && isset($show->thumbnailImage->url)) {
+        cablecast_upsert_post_meta($id, "cablecast_thumbnail_url", $show->thumbnailImage->url);
+      }
+    }
 
     $since = get_option('cablecast_sync_since');
     $sync_index = $sync_index + 1;
@@ -725,5 +732,49 @@ function cablecast_upsert_term_meta($id, $name, $value) {
 
 function cablecast_log ($message) {
   echo "[Cablecast] $message \n";
-  error_log("[Cablecast] $message");
+}
+
+/**
+ * Cleanup local thumbnails when user switches to remote hosting.
+ * Runs in batches during cron to avoid timeout issues.
+ */
+function cablecast_cleanup_local_thumbnails() {
+  $options = get_option('cablecast_options');
+
+  // Only run if deletion requested AND in remote mode
+  if (empty($options['delete_local_thumbnails']) || ($options['thumbnail_mode'] ?? 'local') !== 'remote') {
+    return;
+  }
+
+  $batch_size = 25;
+
+  // Find show posts with featured images
+  $args = [
+    'post_type' => 'show',
+    'meta_query' => [
+      ['key' => '_thumbnail_id', 'compare' => 'EXISTS']
+    ],
+    'posts_per_page' => $batch_size,
+    'fields' => 'ids'
+  ];
+  $posts = get_posts($args);
+
+  if (empty($posts)) {
+    // Done - clear the flag
+    $options['delete_local_thumbnails'] = false;
+    update_option('cablecast_options', $options);
+    cablecast_log("Thumbnail cleanup complete");
+    return;
+  }
+
+  foreach ($posts as $post_id) {
+    $thumbnail_id = get_post_thumbnail_id($post_id);
+    if ($thumbnail_id) {
+      wp_delete_attachment($thumbnail_id, true);
+      delete_post_meta($post_id, '_thumbnail_id');
+      cablecast_log("Deleted thumbnail $thumbnail_id for show $post_id");
+    }
+  }
+
+  cablecast_log("Processed $batch_size thumbnails for deletion, more may remain");
 }

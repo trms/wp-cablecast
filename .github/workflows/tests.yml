@@ -1,0 +1,86 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['7.4', '8.0', '8.1', '8.2']
+        wordpress-version: ['6.2', '6.4', 'latest']
+
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: mbstring, intl, mysqli
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Install WordPress test suite
+        run: |
+          bash bin/install-wp-tests.sh wordpress_test root root 127.0.0.1 ${{ matrix.wordpress-version }} true
+        env:
+          WP_TESTS_DIR: /tmp/wordpress-tests-lib
+          WP_CORE_DIR: /tmp/wordpress
+
+      - name: Run PHPUnit tests
+        run: composer test
+        env:
+          WP_TESTS_DIR: /tmp/wordpress-tests-lib
+          WP_CORE_DIR: /tmp/wordpress
+
+  # Code style check (optional)
+  phpcs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: phpcs
+
+      - name: Check PHP syntax errors
+        run: find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \;

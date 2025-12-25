@@ -30,6 +30,30 @@ function cablecast_settings_init()
             'cablecast_custom_data' => 'custom',
         ]
     );
+
+    // Thumbnail Settings Section
+    add_settings_section(
+        'cablecast_section_thumbnails',
+        __('Thumbnail Settings', 'cablecast'),
+        'cablecast_section_thumbnails_cb',
+        'cablecast'
+    );
+
+    add_settings_field(
+        'cablecast_field_thumbnail_mode',
+        __('Thumbnail Hosting', 'cablecast'),
+        'cablecast_field_thumbnail_mode_cb',
+        'cablecast',
+        'cablecast_section_thumbnails'
+    );
+
+    add_settings_field(
+        'cablecast_field_delete_local_thumbnails',
+        __('Cleanup Local Thumbnails', 'cablecast'),
+        'cablecast_field_delete_local_thumbnails_cb',
+        'cablecast',
+        'cablecast_section_thumbnails'
+    );
 }
 
 /**
@@ -70,6 +94,114 @@ function cablecast_field_server_cb($args)
     <?php
 }
 
+// Thumbnail settings callbacks
+function cablecast_section_thumbnails_cb($args)
+{
+    ?>
+    <p><?php _e('Configure how show thumbnails are handled.', 'cablecast'); ?></p>
+    <?php
+}
+
+function cablecast_field_thumbnail_mode_cb($args)
+{
+    $options = get_option('cablecast_options');
+    $current_mode = isset($options['thumbnail_mode']) ? $options['thumbnail_mode'] : 'local';
+    ?>
+    <fieldset>
+        <label>
+            <input type="radio" name="cablecast_options[thumbnail_mode]" value="local" <?php checked($current_mode, 'local'); ?>>
+            <?php _e('Sync Local', 'cablecast'); ?>
+        </label>
+        <p class="description" style="margin-left: 24px; margin-top: 4px;">
+            <?php _e('Thumbnails will be downloaded as WordPress attachments. Can use significant storage space.', 'cablecast'); ?>
+        </p>
+        <br>
+        <label>
+            <input type="radio" name="cablecast_options[thumbnail_mode]" value="remote" <?php checked($current_mode, 'remote'); ?>>
+            <?php _e('Remote Hosting', 'cablecast'); ?>
+        </label>
+        <p class="description" style="margin-left: 24px; margin-top: 4px;">
+            <?php _e('Use Cablecast for thumbnail hosting. Reduces storage and sync time.', 'cablecast'); ?>
+        </p>
+    </fieldset>
+    <?php
+}
+
+function cablecast_field_delete_local_thumbnails_cb($args)
+{
+    $options = get_option('cablecast_options');
+    $current_mode = isset($options['thumbnail_mode']) ? $options['thumbnail_mode'] : 'local';
+    $delete_enabled = !empty($options['delete_local_thumbnails']);
+
+    // Check if cleanup is in progress
+    $cleanup_in_progress = $delete_enabled && $current_mode === 'remote';
+
+    if ($cleanup_in_progress) {
+        // Count remaining thumbnails to delete
+        $remaining = get_posts([
+            'post_type' => 'show',
+            'meta_query' => [['key' => '_thumbnail_id', 'compare' => 'EXISTS']],
+            'posts_per_page' => -1,
+            'fields' => 'ids'
+        ]);
+        $count = count($remaining);
+        ?>
+        <div class="notice notice-info inline" style="margin: 0; padding: 10px;">
+            <p>
+                <span class="dashicons dashicons-update" style="animation: rotation 2s infinite linear;"></span>
+                <?php printf(__('Thumbnail cleanup in progress... %d remaining.', 'cablecast'), $count); ?>
+            </p>
+        </div>
+        <style>
+            @keyframes rotation {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+        </style>
+        <?php
+        return;
+    }
+
+    // Only show option when in remote mode
+    if ($current_mode !== 'remote') {
+        ?>
+        <p class="description">
+            <?php _e('Switch to Remote Hosting to enable thumbnail cleanup options.', 'cablecast'); ?>
+        </p>
+        <?php
+        return;
+    }
+
+    // Count existing local thumbnails
+    $existing = get_posts([
+        'post_type' => 'show',
+        'meta_query' => [['key' => '_thumbnail_id', 'compare' => 'EXISTS']],
+        'posts_per_page' => -1,
+        'fields' => 'ids'
+    ]);
+    $count = count($existing);
+
+    if ($count === 0) {
+        ?>
+        <p class="description">
+            <?php _e('No local thumbnails to clean up.', 'cablecast'); ?>
+        </p>
+        <?php
+        return;
+    }
+
+    ?>
+    <label>
+        <input type="checkbox" name="cablecast_options[delete_local_thumbnails]" value="1" <?php checked($delete_enabled); ?>>
+        <?php printf(__('Delete %d existing local thumbnails', 'cablecast'), $count); ?>
+    </label>
+    <p class="description" style="color: #d63638; margin-top: 8px;">
+        <strong><?php _e('Warning:', 'cablecast'); ?></strong>
+        <?php _e('This will permanently delete ALL featured images from Show posts. Ensure you have a backup before enabling this option. Deletion happens gradually during cron runs.', 'cablecast'); ?>
+    </p>
+    <?php
+}
+
 /**
  * top level menu
  */
@@ -83,7 +215,45 @@ function cablecast_options_page()
         'cablecast',
         'cablecast_options_page_html'
     );
+
+    add_management_page(
+        'Cablecast Logs',
+        'Cablecast Logs',
+        'manage_options',
+        'cablecast-logs',
+        function () {
+            if ( ! current_user_can('manage_options') ) return;
+            $url = wp_nonce_url(admin_url('admin-post.php?action=cablecast_download_log'), 'cablecast_download_log');
+            echo '<div class="wrap"><h1>Cablecast Logs</h1>';
+            if (\Cablecast\Logger::exists()) {
+                echo '<p><a class="button button-primary" href="' . esc_url($url) . '">Download current log</a></p>';
+            } else {
+                echo '<p>No log file yet.</p>';
+            }
+            echo '</div>';
+        }
+    );
 }
+
+add_action('admin_post_cablecast_download_log', function () {
+    if ( ! current_user_can('manage_options') ) wp_die('Unauthorized', 403);
+    check_admin_referer('cablecast_download_log');
+
+    $path = \Cablecast\Logger::path();
+    if ( ! file_exists($path) ) wp_die('No log file found.');
+
+    // Nice filename with date
+    $download = 'cablecast-' . wp_date('Ymd-His') . '.log';
+
+    // Clean output buffers to avoid corrupting download
+    while (ob_get_level()) { ob_end_clean(); }
+
+    header('Content-Type: text/plain');
+    header('Content-Disposition: attachment; filename="' . $download . '"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
+});
 
 /**
  * register our cablecast_options_page to the admin_menu action hook

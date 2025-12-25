@@ -159,3 +159,255 @@ function filter_shows_by_taxonomy($query) {
   }
 }
 add_filter('parse_query', 'filter_shows_by_taxonomy');
+
+
+
+/**
+ * Cablecast: external CDN thumbnails for "show" CPT (no local attachments).
+ * - Front-end renders CDN image via normal thumbnail APIs.
+ * - Admin can override by setting a real Featured Image (we back off).
+ */
+
+/**
+ * Build the external CDN URL for a show thumbnail.
+ * Adjust the mapping/URL to match your CDN.
+ */
+function cablecast_has_real_featured_image( $post_id ) {
+    // Safe here; we are NOT inside get_post_metadata for _thumbnail_id.
+    $thumb_id = (int) get_post_meta( $post_id, '_thumbnail_id', true );
+
+    if ( $thumb_id <= 0 ) {
+        return false;
+    }
+
+    // Optional: ensure it’s a real attachment
+    $att = get_post( $thumb_id );
+    return ( $att && $att->post_type === 'attachment' );
+}
+
+
+function cablecast_show_thumbnail_url( $post_id, $size = 'post-thumbnail' ) {
+    // First check for saved thumbnail URL from API
+    $base_thumbnail_url = get_post_meta( $post_id, 'cablecast_thumbnail_url', true );
+
+    if ( ! $base_thumbnail_url ) {
+        // Fallback: construct URL from server settings and show ID
+        $options = get_option('cablecast_options');
+        $server = rtrim($options['server'] ?? '', '/');
+        $show_id = get_post_meta( $post_id, 'cablecast_show_id', true );
+        if ( ! $server || ! $show_id ) {
+            return '';
+        }
+        // Use the watch redirect endpoint as fallback (won't have size control)
+        $base_thumbnail_url = "{$server}/cablecastapi/watch/show/{$show_id}/thumbnail";
+    }
+
+    // Map common WP sizes to CDN dimension parameters
+    $map = [
+        'thumbnail'      => '100x100',
+        'medium'         => '500x500',
+        'large'          => '1000x1000',
+        'post-thumbnail' => '640x360',
+        'full'           => '',  // no param = original size
+    ];
+
+    // Support [width, height] arrays
+    if ( is_array( $size ) && isset( $size[0], $size[1] ) ) {
+        $dimensions = absint( $size[0] ) . 'x' . absint( $size[1] );
+    } else {
+        $dimensions = $map[ $size ] ?? '';
+    }
+
+    $url = $base_thumbnail_url;
+    if ( $dimensions ) {
+        $url .= '?d=' . $dimensions;
+    }
+
+    // Allow theme/site overrides.
+    return apply_filters( 'cablecast_show_thumbnail_url', $url, $post_id, $size );
+}
+
+/**
+ * Optional: responsive srcset using CDN variants.
+ * Tweak to match the sizes your CDN can produce efficiently.
+ */
+function cablecast_show_thumbnail_srcset( $post_id ) {
+    $base_thumbnail_url = get_post_meta( $post_id, 'cablecast_thumbnail_url', true );
+    if ( ! $base_thumbnail_url ) {
+        return '';
+    }
+
+    $variants = [
+        '320x180'  => 320,
+        '480x270'  => 480,
+        '640x360'  => 640,
+        '960x540'  => 960,
+        '1280x720' => 1280,
+    ];
+
+    $parts = [];
+    foreach ( $variants as $wh => $w ) {
+        $parts[] = esc_url( $base_thumbnail_url . "?d={$wh}" ) . " {$w}w";
+    }
+
+    return implode( ', ', $parts );
+}
+
+/**
+ * Helper to resolve the current show post ID from various contexts.
+ */
+function cablecast_current_show_post_id( $maybe_post_id = null ) {
+    if ( $maybe_post_id ) {
+        $ptype = get_post_type( $maybe_post_id );
+        if ( $ptype === 'show' ) return (int) $maybe_post_id;
+    }
+    $global = get_post();
+    if ( $global && get_post_type( $global ) === 'show' ) {
+        return (int) $global->ID;
+    }
+    // Support /?show=<slug> routing
+    if ( isset( $_GET['show'] ) ) {
+        $slug = sanitize_title_for_query( wp_unslash( $_GET['show'] ) );
+        if ( $slug ) {
+            $obj = get_page_by_path( $slug, OBJECT, 'show' );
+            if ( $obj ) return (int) $obj->ID;
+        }
+    }
+    return 0;
+}
+
+// Only register CDN thumbnail filters when in remote hosting mode
+$cablecast_thumbnail_options = get_option('cablecast_options');
+$cablecast_thumbnail_mode = isset($cablecast_thumbnail_options['thumbnail_mode']) ? $cablecast_thumbnail_options['thumbnail_mode'] : 'local';
+
+if ($cablecast_thumbnail_mode === 'remote') :
+
+/**
+ * has_post_thumbnail(): true if there's a real Featured Image OR a show_id (CDN).
+ * (No recursion risk here; we don't touch _thumbnail_id.)
+ */
+add_filter( 'has_post_thumbnail', function ( $has, $post, $thumb_id ) {
+    // Divi (and others) may pass an int here. Normalize to a post ID.
+    $pid = ($post instanceof WP_Post) ? $post->ID : ( is_numeric($post) ? (int) $post : 0 );
+
+    // Resolve the intended Show post (handles ?show=<slug> too, if you use that helper)
+    $target_id = function_exists('cablecast_current_show_post_id')
+        ? cablecast_current_show_post_id( $pid )
+        : $pid;
+
+    if ( ! $target_id || get_post_type( $target_id ) !== 'show' ) {
+        return $has; // not a Show context
+    }
+
+    $has_real = function_exists('cablecast_has_real_featured_image')
+        ? cablecast_has_real_featured_image( $target_id )
+        : ( (int) get_post_meta( $target_id, '_thumbnail_id', true ) > 0 );
+
+    $has_cdn  = (bool) get_post_meta( $target_id, 'cablecast_show_id', true );
+
+    return $has_real || $has_cdn;
+}, 10, 3 );
+
+/**
+ * Fake a _thumbnail_id on the front-end so get_the_post_thumbnail() runs.
+ * IMPORTANT: Never recurse. Respect real values. Only fake when needed.
+ */
+add_filter( 'get_post_metadata', function ( $value, $object_id, $meta_key, $single ) {
+    if ( '_thumbnail_id' !== $meta_key ) {
+        return $value; // only care about featured image key
+    }
+
+    // If core already resolved a value (real Featured Image), respect it.
+    // $value is null when core didn't find anything.
+    if ( null !== $value ) {
+        return $value;
+    }
+
+    // Front-end only; avoid confusing the editor UI.
+    if ( is_admin() ) {
+        return $value;
+    }
+
+    // Only for our CPT.
+    if ( 'show' !== get_post_type( $object_id ) ) {
+        return $value;
+    }
+
+    // Only fake if we actually have an external image source.
+    $show_id = get_post_meta( $object_id, 'cablecast_show_id', true ); // different key -> safe
+    if ( ! $show_id ) {
+        return $value;
+    }
+
+    // Return a non-zero int so WP thinks there is a thumbnail.
+    return $single ? -1 : [ -1 ];
+}, 10, 4 );
+
+add_filter( 'post_thumbnail_html', function ( $html, $post_id, $thumb_id, $size, $attr ) {
+    $target_id = cablecast_current_show_post_id( $post_id );
+
+    if ( cablecast_has_real_featured_image( $target_id ) ) {
+        \Cablecast\Logger::log('info', "THUMB_HTML: valid real featured image ($thumb_id) exists, leaving html unchanged");
+        return $html;
+    }
+
+
+
+    $src = cablecast_show_thumbnail_url( $target_id, $size );
+    
+    if ( ! $src ) {
+        \Cablecast\Logger::log('info', "THUMB_HTML: no CDN url built, returning original html");
+        return $html;
+    }
+
+    \Cablecast\Logger::log('info', "THUMB_HTML: replacing html with CDN img: {$src}");
+
+    $defaults = [
+        'alt'     => get_the_title( $target_id ),
+        'loading' => 'lazy',
+        'class'   => is_string( $size ) ? 'attachment-' . $size . ' size-' . $size : 'attachment-external',
+        'srcset'  => cablecast_show_thumbnail_srcset( $target_id ),
+        'sizes'   => '(max-width: 640px) 100vw, 640px',
+    ];
+    $attr = wp_parse_args( $attr, $defaults );
+
+    $attr_str = '';
+    foreach ( $attr as $k => $v ) {
+        if ( $v === '' || $v === null ) continue;
+        $attr_str .= ' ' . esc_attr( $k ) . '="' . esc_attr( $v ) . '"';
+    }
+
+    return '<img src="' . esc_url( $src ) . '"' . $attr_str . ' />';
+}, 10, 5 );
+
+add_filter( 'post_thumbnail_url', function ( $url, $post, $size ) {
+    $pid = $post instanceof WP_Post ? $post->ID : ( is_numeric( $post ) ? (int) $post : 0 );
+    $target_id = cablecast_current_show_post_id( $pid );
+
+    if ( cablecast_has_real_featured_image( $target_id ) ) {
+        \Cablecast\Logger::log('info', "THUMB_HTML: valid real featured image ($thumb_id) exists, leaving html unchanged");
+        return $url;
+    }
+
+    \Cablecast\Logger::log('info', "THUMB_URL: called with raw_post=" . (is_object($post)? "WP_Post({$post->ID})" : var_export($post, true)) .
+               ", resolved target_id={$target_id}, size=" . print_r($size, true) .
+               ", incoming url=" . var_export($url, true) );
+
+    if ( ! $target_id ) {
+        \Cablecast\Logger::log('info', "THUMB_URL: no target_id, returning original url" );
+        return $url;
+    }
+
+    if ( metadata_exists( 'post', $target_id, '_thumbnail_id' ) && empty($url) == false ) {
+        \Cablecast\Logger::log('info', "THUMB_URL: real featured image exists, returning original url: $url" );
+        return $url;
+    }
+
+    $custom = cablecast_show_thumbnail_url( $target_id, $size );
+
+    \Cablecast\Logger::log('info', "THUMB_URL: built custom url=" . var_export($custom, true) );
+
+    return $custom ?: $url;
+}, 10, 3 );
+
+endif; // End remote thumbnail mode filters

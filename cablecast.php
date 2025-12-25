@@ -5,6 +5,7 @@ Author: Ray Tiley
 Author URI: https://github.com/raytiley
 Description: This plugin creates custom post types to store information about shows and schedule information from Tightrope Media Systems Cablecast Automation system.
 */
+require_once __DIR__ . '/includes/Logger.php';
 
 global $cablecast_db_version;
 $cablecast_db_version = '1.1';
@@ -18,6 +19,17 @@ register_deactivation_hook( __FILE__, 'cablecast_deactivate' );
 function cablecast_install() {
     // trigger our function that registers the custom post type
     cablecast_setup_post_types();
+
+    // Set default thumbnail mode based on new vs upgrade install
+    $existing_options = get_option('cablecast_options');
+    if ($existing_options === false) {
+        // Fresh install - default to remote hosting
+        update_option('cablecast_options', ['thumbnail_mode' => 'remote']);
+    } else if (!isset($existing_options['thumbnail_mode'])) {
+        // Upgrade from older version - preserve old behavior (sync local)
+        $existing_options['thumbnail_mode'] = 'local';
+        update_option('cablecast_options', $existing_options);
+    }
 
     global $wpdb;
   	global $cablecast_db_version;
