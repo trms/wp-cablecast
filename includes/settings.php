@@ -321,8 +321,9 @@ add_action('wp_ajax_cablecast_test_cdn', function() {
 
     if (empty($shows)) {
         // No shows with thumbnails, try testing a sample URL pattern
-        $test_url = rtrim($server, '/') . CABLECAST_API_BASE . '/shows';
-        $response = wp_remote_head($test_url, ['timeout' => 10]);
+        // Use GET with page_size=1 since some servers don't support HEAD requests
+        $test_url = rtrim($server, '/') . CABLECAST_API_BASE . '/shows?page_size=1';
+        $response = wp_remote_get($test_url, ['timeout' => 10]);
 
         if (is_wp_error($response)) {
             wp_send_json_error(sprintf(__('Cannot reach server: %s', 'cablecast'), $response->get_error_message()));
@@ -339,8 +340,9 @@ add_action('wp_ajax_cablecast_test_cdn', function() {
     }
 
     // Test loading the thumbnail URL
+    // Use GET since some servers don't support HEAD requests
     $thumbnail_url = get_post_meta($shows[0]->ID, 'cablecast_thumbnail_url', true);
-    $response = wp_remote_head($thumbnail_url, ['timeout' => 10]);
+    $response = wp_remote_get($thumbnail_url, ['timeout' => 10]);
 
     if (is_wp_error($response)) {
         wp_send_json_error(sprintf(__('Thumbnail load failed: %s', 'cablecast'), $response->get_error_message()));
