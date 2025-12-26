@@ -1,43 +1,62 @@
 <?php
 
 function cablecast_sync_data() {
-  $options = get_option('cablecast_options');
-  $server = $options["server"];
-  cablecast_log ("Syncing data for $server");
+  // Prevent concurrent sync operations using a transient lock
+  $lock_key = 'cablecast_sync_lock';
+  $lock_timeout = 300; // 5 minute lock timeout
 
-  $field_response = wp_remote_get("$server/cablecastapi/v1/showfields", array('timeout' => 30));
-  if (!is_wp_error($field_response) && wp_remote_retrieve_response_code($field_response) === 200) {
-    $field_definitions = json_decode(wp_remote_retrieve_body($field_response));
-    if (isset($field_definitions->fieldDefinitions) && isset($field_definitions->showFields)) {
-      update_option('cablecast_custom_taxonomy_definitions', $field_definitions);
-    }
-  } else {
-    \Cablecast\Logger::log('error', 'Failed to fetch show field definitions from API');
+  if (get_transient($lock_key)) {
+    \Cablecast\Logger::log('warning', 'Sync already in progress, skipping this run');
+    return;
   }
 
-  $channels = cablecast_get_resources("$server/cablecastapi/v1/channels", 'channels');
-  $live_streams = cablecast_get_resources("$server/cablecastapi/v1/livestreams", 'liveStreams');
-  $categories = cablecast_get_resources("$server/cablecastapi/v1/categories", 'categories');
-  $producers = cablecast_get_resources("$server/cablecastapi/v1/producers", 'producers');
-  $projects = cablecast_get_resources("$server/cablecastapi/v1/projects", 'projects');
-  $show_fields = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'showFields');
-  $field_definitions = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'fieldDefinitions');
+  // Acquire the lock
+  set_transient($lock_key, true, $lock_timeout);
 
-  $today = date('Y-m-d', strtotime("now"));
-  $two_weeks_from_now = date('Y-m-d', strtotime('+2 weeks'));
-  $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$today&end=$two_weeks_from_now&include_cg_exempt=false&page_size=2000";
-  $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems');
+  try {
+    $options = get_option('cablecast_options');
+    $server = $options["server"];
+    \Cablecast\Logger::log('info', "Syncing data for $server");
 
-  $shows_payload = cablecast_get_shows_payload();
+    $field_response = wp_remote_get("$server/cablecastapi/v1/showfields", array('timeout' => 30));
+    if (!is_wp_error($field_response) && wp_remote_retrieve_response_code($field_response) === 200) {
+      $field_definitions = json_decode(wp_remote_retrieve_body($field_response));
+      if (isset($field_definitions->fieldDefinitions) && isset($field_definitions->showFields)) {
+        update_option('cablecast_custom_taxonomy_definitions', $field_definitions);
+      }
+    } else {
+      \Cablecast\Logger::log('error', 'Failed to fetch show field definitions from API');
+    }
 
-  cablecast_sync_channels($channels, $live_streams);
-  cablecast_sync_projects($projects);
-  cablecast_sync_producers($producers);
-  cablecast_sync_categories($categories);
+    $channels = cablecast_get_resources("$server/cablecastapi/v1/channels", 'channels');
+    $live_streams = cablecast_get_resources("$server/cablecastapi/v1/livestreams", 'liveStreams');
+    $categories = cablecast_get_resources("$server/cablecastapi/v1/categories", 'categories');
+    $producers = cablecast_get_resources("$server/cablecastapi/v1/producers", 'producers');
+    $projects = cablecast_get_resources("$server/cablecastapi/v1/projects", 'projects');
+    $show_fields = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'showFields');
+    $field_definitions = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'fieldDefinitions');
 
-  cablecast_sync_shows($shows_payload, $categories, $projects, $producers, $show_fields, $field_definitions);
-  cablecast_sync_schedule($schedule_items);
-  cablecast_log( "Finished");
+    $today = date('Y-m-d', strtotime("now"));
+    $two_weeks_from_now = date('Y-m-d', strtotime('+2 weeks'));
+    $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$today&end=$two_weeks_from_now&include_cg_exempt=false&page_size=2000";
+    $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems');
+
+    $shows_payload = cablecast_get_shows_payload();
+
+    cablecast_sync_channels($channels, $live_streams);
+    cablecast_sync_projects($projects);
+    cablecast_sync_producers($producers);
+    cablecast_sync_categories($categories);
+
+    cablecast_sync_shows($shows_payload, $categories, $projects, $producers, $show_fields, $field_definitions);
+    cablecast_sync_schedule($schedule_items);
+    \Cablecast\Logger::log('info', "Sync finished successfully");
+  } catch (Exception $e) {
+    \Cablecast\Logger::log('error', "Sync failed with exception: " . $e->getMessage());
+  } finally {
+    // Always release the lock when done, even if an error occurred
+    delete_transient($lock_key);
+  }
 }
 
 function cablecast_get_shows_payload() {
@@ -52,7 +71,7 @@ function cablecast_get_shows_payload() {
     $sync_index = 0;
   }
   $server = $options["server"];
-  cablecast_log ("Getting shows since: $since" );
+  \Cablecast\Logger::log('info', "Getting shows since: $since");
 
   $json_search = "{\"savedShowSearch\":{\"query\":{\"groups\":[{\"orAnd\":\"and\",\"filters\":[{\"field\":\"lastModified\",\"operator\":\"greaterThan\",\"searchValue\":\"$since\"}]}],\"sortOptions\":[{\"field\":\"lastModified\",\"descending\":false},{\"field\":\"title\",\"descending\":false}]},\"name\":\"\"}}";
 
@@ -92,7 +111,7 @@ function cablecast_get_shows_payload() {
   }
 
   if ($total_result_count == 0) {
-    cablecast_log("No shows to sync");
+    \Cablecast\Logger::log('info', "No shows to sync");
     $response = new stdClass();
     $response->shows = [];
     return $response;
@@ -103,7 +122,7 @@ function cablecast_get_shows_payload() {
   $end_index = $sync_index + $processing_result_count;
 
   update_option('cablecast_sync_total_result_count', $total_result_count);
-  cablecast_log("Processing $sync_index through $end_index out of $total_result_count results for search");
+  \Cablecast\Logger::log('info', "Processing $sync_index through $end_index out of $total_result_count results for search");
 
   $id_query = "";
   foreach ($ids as $id) {
@@ -111,7 +130,7 @@ function cablecast_get_shows_payload() {
   }
 
   $url = "$server/cablecastapi/v1/shows?page_size=$batch_size&include=reel,vod,webfile,thumbnail$id_query";
-  cablecast_log("Retreving shows from using: $url");
+  \Cablecast\Logger::log('info', "Retreving shows from using: $url");
 
   // Use wp_remote_get instead of file_get_contents for proper timeout handling
   $shows_response = wp_remote_get($url, array('timeout' => 30));
@@ -151,7 +170,7 @@ function cablecast_get_resources($url, $key, $ensure_all_loaded = FALSE) {
       $paged_url = "$url&page_size=$page_size";
     }
 
-    cablecast_log("Retreiving $key from $paged_url");
+    \Cablecast\Logger::log('info', "Retreiving $key from $paged_url");
 
     // Use wp_remote_get instead of file_get_contents for proper timeout handling
     $response = wp_remote_get($paged_url, array('timeout' => 30));
@@ -173,10 +192,10 @@ function cablecast_get_resources($url, $key, $ensure_all_loaded = FALSE) {
     }
 
     if ($ensure_all_loaded && isset($result->meta) && $result->meta->count > $result->meta->pageSize) {
-      cablecast_log("Not enough schedule items loaded. Increase page size");
+      \Cablecast\Logger::log('info', "Not enough schedule items loaded. Increase page size");
       $page_size = $result->meta->count + 10;
       $paged_url = "$url&page_size=$page_size";
-      cablecast_log("Retreiving $key from $paged_url");
+      \Cablecast\Logger::log('info', "Retreiving $key from $paged_url");
 
       $response = wp_remote_get($paged_url, array('timeout' => 60)); // longer timeout for large payloads
       if (is_wp_error($response)) {
@@ -211,7 +230,7 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
   $thumbnail_mode = isset($options['thumbnail_mode']) ? $options['thumbnail_mode'] : 'local';
 
   foreach($shows_payload->shows as $show) {
-    cablecast_log ("Syncing Show: ($show->id) $show->title");
+    \Cablecast\Logger::log('debug', "Syncing Show: ($show->id) $show->title");
     $args = array(
         'meta_key' => 'cablecast_show_id',
         'meta_value' => $show->id,
@@ -375,7 +394,77 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
       update_option('cablecast_sync_total_result_count', 0);
       update_option('cablecast_sync_index', 0);
       update_option('cablecast_sync_since', $since);
+
+      // Run orphan detection after a full sync cycle completes
+      cablecast_detect_orphan_posts();
     }
+  }
+}
+
+/**
+ * Detect shows in WordPress that may no longer exist in Cablecast.
+ * Logs warnings for potential orphans but does not auto-delete.
+ */
+function cablecast_detect_orphan_posts() {
+  $options = get_option('cablecast_options');
+  $server = $options["server"] ?? '';
+
+  if (empty($server)) {
+    return;
+  }
+
+  // Only run orphan detection once per day to avoid excessive API calls
+  $last_check = get_option('cablecast_orphan_check_last_run', 0);
+  $one_day_ago = time() - DAY_IN_SECONDS;
+
+  if ($last_check > $one_day_ago) {
+    return;
+  }
+
+  update_option('cablecast_orphan_check_last_run', time());
+
+  // Get all Cablecast show IDs from the API
+  $api_url = "$server/cablecastapi/v1/shows?page_size=10000&fields=id";
+  $response = wp_remote_get($api_url, array('timeout' => 60));
+
+  if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+    \Cablecast\Logger::log('warning', 'Could not fetch show IDs for orphan detection');
+    return;
+  }
+
+  $body = json_decode(wp_remote_retrieve_body($response));
+  if (!$body || !isset($body->shows)) {
+    return;
+  }
+
+  // Extract all Cablecast show IDs
+  $api_show_ids = array_map(function($show) {
+    return (int) $show->id;
+  }, $body->shows);
+
+  // Get all WordPress show posts with cablecast_show_id
+  $wp_shows = get_posts(array(
+    'post_type' => 'show',
+    'post_status' => 'any',
+    'posts_per_page' => -1,
+    'meta_key' => 'cablecast_show_id',
+    'fields' => 'ids',
+  ));
+
+  $orphan_count = 0;
+  foreach ($wp_shows as $post_id) {
+    $cablecast_id = (int) get_post_meta($post_id, 'cablecast_show_id', true);
+    if ($cablecast_id && !in_array($cablecast_id, $api_show_ids, true)) {
+      $orphan_count++;
+      $post_title = get_the_title($post_id);
+      \Cablecast\Logger::log('warning', "Potential orphan: Show '$post_title' (WP ID: $post_id, Cablecast ID: $cablecast_id) not found in Cablecast API");
+    }
+  }
+
+  if ($orphan_count > 0) {
+    \Cablecast\Logger::log('info', "Orphan detection complete: $orphan_count potential orphan(s) found");
+  } else {
+    \Cablecast\Logger::log('info', "Orphan detection complete: No orphans found");
   }
 }
 
@@ -476,7 +565,7 @@ function cablecast_sync_schedule($scheduleItems) {
 
   $prev_hash = get_option($option_key, '');
   if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
-    cablecast_log("Schedule items unchanged; skipping DB sync.");
+    \Cablecast\Logger::log('info', "Schedule items unchanged; skipping DB sync.");
     return false; // unchanged payload; skip DB work
   }
 
@@ -602,7 +691,7 @@ function cablecast_sync_categories($categories) {
 
   $prev_hash = get_option($option_key, '');
   if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
-    cablecast_log("Category items unchanged; skipping DB sync.");
+    \Cablecast\Logger::log('info', "Category items unchanged; skipping DB sync.");
     return false; // unchanged payload; skip DB work
   }
 
@@ -632,7 +721,7 @@ function cablecast_sync_projects($projects) {
 
   $prev_hash = get_option($option_key, '');
   if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
-    cablecast_log("Project items unchanged; skipping DB sync.");
+    \Cablecast\Logger::log('info', "Project items unchanged; skipping DB sync.");
     return false; // unchanged payload; skip DB work
   }
 
@@ -671,7 +760,7 @@ function cablecast_sync_producers($producers) {
 
   $prev_hash = get_option($option_key, '');
   if (!empty($prev_hash) && hash_equals($prev_hash, $new_hash)) {
-    cablecast_log("Producer items unchanged; skipping DB sync.");
+    \Cablecast\Logger::log('info', "Producer items unchanged; skipping DB sync.");
     return false; // unchanged payload; skip DB work
   }
   
@@ -815,8 +904,11 @@ function cablecast_upsert_term_meta($id, $name, $value) {
   }
 }
 
+/**
+ * @deprecated Use \Cablecast\Logger::log() instead
+ */
 function cablecast_log ($message) {
-  echo "[Cablecast] $message \n";
+  \Cablecast\Logger::log('info', $message);
 }
 
 /**
@@ -848,7 +940,7 @@ function cablecast_cleanup_local_thumbnails() {
     // Done - clear the flag
     $options['delete_local_thumbnails'] = false;
     update_option('cablecast_options', $options);
-    cablecast_log("Thumbnail cleanup complete");
+    \Cablecast\Logger::log('info', "Thumbnail cleanup complete");
     return;
   }
 
@@ -857,9 +949,9 @@ function cablecast_cleanup_local_thumbnails() {
     if ($thumbnail_id) {
       wp_delete_attachment($thumbnail_id, true);
       delete_post_meta($post_id, '_thumbnail_id');
-      cablecast_log("Deleted thumbnail $thumbnail_id for show $post_id");
+      \Cablecast\Logger::log('info', "Deleted thumbnail $thumbnail_id for show $post_id");
     }
   }
 
-  cablecast_log("Processed $batch_size thumbnails for deletion, more may remain");
+  \Cablecast\Logger::log('info', "Processed $batch_size thumbnails for deletion, more may remain");
 }
