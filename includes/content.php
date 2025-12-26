@@ -24,6 +24,7 @@ function cablecast_setup_post_types() {
     // register the "book" custom post type
     register_post_type( 'show', [
       'public' => true,
+      'hierarchical' => false,
       'menu_icon' => 'dashicons-video-alt3',
       'labels' => [
         'name' => __('Shows'),
@@ -209,19 +210,24 @@ function cablecast_has_real_featured_image( $post_id ) {
 
 
 function cablecast_show_thumbnail_url( $post_id, $size = 'post-thumbnail' ) {
-    // First check for saved thumbnail URL from API
+    $options = get_option('cablecast_options');
+    $thumbnail_mode = isset($options['thumbnail_mode']) ? $options['thumbnail_mode'] : 'local';
+
+    // For local mode, check WordPress featured image first
+    if ( $thumbnail_mode === 'local' ) {
+        $featured_url = get_the_post_thumbnail_url( $post_id, $size );
+        if ( $featured_url ) {
+            return apply_filters( 'cablecast_show_thumbnail_url', $featured_url, $post_id, $size );
+        }
+    }
+
+    // Check for saved thumbnail URL from API (remote mode or fallback)
     $base_thumbnail_url = get_post_meta( $post_id, 'cablecast_thumbnail_url', true );
 
+    // No thumbnail available - return empty string instead of constructing
+    // a fallback URL that may not exist on the server
     if ( ! $base_thumbnail_url ) {
-        // Fallback: construct URL from server settings and show ID
-        $options = get_option('cablecast_options');
-        $server = rtrim($options['server'] ?? '', '/');
-        $show_id = get_post_meta( $post_id, 'cablecast_show_id', true );
-        if ( ! $server || ! $show_id ) {
-            return '';
-        }
-        // Use the watch redirect endpoint as fallback (won't have size control)
-        $base_thumbnail_url = "{$server}/cablecastapi/watch/show/{$show_id}/thumbnail";
+        return '';
     }
 
     // Support [width, height] arrays or use defined size mappings

@@ -966,4 +966,251 @@ class ShortcodesTest extends WP_UnitTestCase {
         $result = cablecast_is_filler('<script>alert(1)</script>');
         $this->assertTrue($result);
     }
+
+    // =========================================================================
+    // Upcoming Runs Shortcode Tests
+    // =========================================================================
+
+    /**
+     * Test [cablecast_upcoming_runs] is registered.
+     */
+    public function test_upcoming_runs_registered() {
+        $this->assertTrue(shortcode_exists('cablecast_upcoming_runs'));
+    }
+
+    /**
+     * Test [cablecast_upcoming_runs] returns empty with no runs.
+     */
+    public function test_upcoming_runs_no_results() {
+        $output = do_shortcode('[cablecast_upcoming_runs id="' . $this->show_post_id . '"]');
+
+        // Should return empty when no upcoming runs exist
+        $this->assertEmpty($output);
+    }
+
+    /**
+     * Test [cablecast_upcoming_runs] with scheduled runs.
+     */
+    public function test_upcoming_runs_with_results() {
+        global $wpdb;
+
+        // Ensure schedule table exists
+        $wpdb->query("CREATE TABLE IF NOT EXISTS {$this->schedule_table} (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            run_date_time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+            show_id int NOT NULL,
+            show_title varchar(255) DEFAULT '' NOT NULL,
+            channel_id int NOT NULL,
+            show_post_id int NOT NULL,
+            channel_post_id int NOT NULL,
+            schedule_item_id int NOT NULL,
+            cg_exempt tinyint(1) DEFAULT 0 NOT NULL,
+            PRIMARY KEY (id)
+        )");
+
+        // Insert a future schedule item
+        $future_date = date('Y-m-d H:i:s', strtotime('+1 day'));
+        $wpdb->insert($this->schedule_table, [
+            'run_date_time' => $future_date,
+            'show_id' => 12345,
+            'show_title' => 'Test Show',
+            'channel_id' => 1,
+            'show_post_id' => $this->show_post_id,
+            'channel_post_id' => $this->channel_post_id,
+            'schedule_item_id' => 1,
+            'cg_exempt' => 0,
+        ]);
+
+        $output = do_shortcode('[cablecast_upcoming_runs id="' . $this->show_post_id . '"]');
+
+        $this->assertStringContainsString('cablecast-upcoming-runs', $output);
+        $this->assertStringContainsString('Upcoming Airings', $output);
+        $this->assertStringContainsString('Test Channel', $output);
+
+        // Clean up
+        $wpdb->query("DELETE FROM {$this->schedule_table} WHERE show_post_id = {$this->show_post_id}");
+    }
+
+    /**
+     * Test [cablecast_upcoming_runs] respects count attribute.
+     */
+    public function test_upcoming_runs_count_attribute() {
+        global $wpdb;
+
+        // Insert multiple future schedule items
+        for ($i = 1; $i <= 10; $i++) {
+            $future_date = date('Y-m-d H:i:s', strtotime("+{$i} day"));
+            $wpdb->insert($this->schedule_table, [
+                'run_date_time' => $future_date,
+                'show_id' => 12345,
+                'show_title' => 'Test Show',
+                'channel_id' => 1,
+                'show_post_id' => $this->show_post_id,
+                'channel_post_id' => $this->channel_post_id,
+                'schedule_item_id' => $i,
+                'cg_exempt' => 0,
+            ]);
+        }
+
+        $output = do_shortcode('[cablecast_upcoming_runs id="' . $this->show_post_id . '" count="3"]');
+
+        // Count the number of list items
+        $count = substr_count($output, 'cablecast-upcoming-runs__item');
+        $this->assertEquals(3, $count);
+
+        // Clean up
+        $wpdb->query("DELETE FROM {$this->schedule_table} WHERE show_post_id = {$this->show_post_id}");
+    }
+
+    /**
+     * Test [cablecast_upcoming_runs] hides channel when disabled.
+     */
+    public function test_upcoming_runs_hide_channel() {
+        global $wpdb;
+
+        $future_date = date('Y-m-d H:i:s', strtotime('+1 day'));
+        $wpdb->insert($this->schedule_table, [
+            'run_date_time' => $future_date,
+            'show_id' => 12345,
+            'show_title' => 'Test Show',
+            'channel_id' => 1,
+            'show_post_id' => $this->show_post_id,
+            'channel_post_id' => $this->channel_post_id,
+            'schedule_item_id' => 1,
+            'cg_exempt' => 0,
+        ]);
+
+        $output = do_shortcode('[cablecast_upcoming_runs id="' . $this->show_post_id . '" show_channel="false"]');
+
+        $this->assertStringNotContainsString('cablecast-upcoming-runs__channel', $output);
+
+        // Clean up
+        $wpdb->query("DELETE FROM {$this->schedule_table} WHERE show_post_id = {$this->show_post_id}");
+    }
+
+    /**
+     * Test [cablecast_upcoming_runs] requires valid show ID.
+     */
+    public function test_upcoming_runs_invalid_id() {
+        $output = do_shortcode('[cablecast_upcoming_runs id="99999"]');
+
+        // Should return empty for invalid ID
+        $this->assertEmpty($output);
+    }
+
+    /**
+     * Test [cablecast_upcoming_runs] with custom class.
+     */
+    public function test_upcoming_runs_custom_class() {
+        global $wpdb;
+
+        $future_date = date('Y-m-d H:i:s', strtotime('+1 day'));
+        $wpdb->insert($this->schedule_table, [
+            'run_date_time' => $future_date,
+            'show_id' => 12345,
+            'show_title' => 'Test Show',
+            'channel_id' => 1,
+            'show_post_id' => $this->show_post_id,
+            'channel_post_id' => $this->channel_post_id,
+            'schedule_item_id' => 1,
+            'cg_exempt' => 0,
+        ]);
+
+        $output = do_shortcode('[cablecast_upcoming_runs id="' . $this->show_post_id . '" class="my-custom-class"]');
+
+        $this->assertStringContainsString('my-custom-class', $output);
+
+        // Clean up
+        $wpdb->query("DELETE FROM {$this->schedule_table} WHERE show_post_id = {$this->show_post_id}");
+    }
+
+    // =========================================================================
+    // Template Loader Tests
+    // =========================================================================
+
+    /**
+     * Test template loader functions exist.
+     */
+    public function test_template_loader_functions_exist() {
+        $this->assertTrue(function_exists('cablecast_get_template'));
+        $this->assertTrue(function_exists('cablecast_locate_template'));
+        $this->assertTrue(function_exists('cablecast_get_templates_dir'));
+    }
+
+    /**
+     * Test cablecast_get_templates_dir returns valid path.
+     */
+    public function test_templates_dir_exists() {
+        $dir = cablecast_get_templates_dir();
+        $this->assertNotEmpty($dir);
+        $this->assertStringContainsString('templates', $dir);
+    }
+
+    /**
+     * Test cablecast_locate_template finds plugin templates.
+     */
+    public function test_locate_template_finds_plugin_templates() {
+        $template = cablecast_locate_template('single-show.php');
+        $this->assertNotEmpty($template);
+        $this->assertStringContainsString('single-show.php', $template);
+    }
+
+    /**
+     * Test cablecast_has_vod helper function.
+     */
+    public function test_has_vod_helper() {
+        // Show with VOD
+        $this->assertTrue(cablecast_has_vod($this->show_post_id));
+
+        // Show without VOD
+        $show_without_vod = wp_insert_post([
+            'post_title' => 'No VOD Show',
+            'post_type' => 'show',
+            'post_status' => 'publish',
+        ]);
+        $this->assertFalse(cablecast_has_vod($show_without_vod));
+        wp_delete_post($show_without_vod, true);
+    }
+
+    /**
+     * Test cablecast_has_chapters helper function.
+     */
+    public function test_has_chapters_helper() {
+        // Show without chapters
+        $this->assertFalse(cablecast_has_chapters($this->show_post_id));
+
+        // Show with chapters
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', [
+            ['id' => 1, 'title' => 'Chapter 1', 'offset' => 0],
+        ]);
+        $this->assertTrue(cablecast_has_chapters($this->show_post_id));
+    }
+
+    /**
+     * Test cablecast_get_show_meta helper function.
+     */
+    public function test_get_show_meta_helper() {
+        $meta = cablecast_get_show_meta($this->show_post_id);
+
+        $this->assertIsArray($meta);
+        $this->assertArrayHasKey('runtime', $meta);
+        $this->assertArrayHasKey('producer', $meta);
+        $this->assertArrayHasKey('category', $meta);
+        $this->assertArrayHasKey('series', $meta);
+
+        $this->assertEquals('Test Producer', $meta['producer']['value']);
+        $this->assertEquals('Test Category', $meta['category']['value']);
+        $this->assertEquals('Test Project', $meta['series']['value']);
+    }
+
+    /**
+     * Test cablecast_format_runtime helper function.
+     */
+    public function test_format_runtime_helper() {
+        $this->assertEquals('0:00', cablecast_format_runtime(0));
+        $this->assertEquals('1:30', cablecast_format_runtime(90));
+        $this->assertEquals('10:05', cablecast_format_runtime(605));
+        $this->assertEquals('1:00:00', cablecast_format_runtime(3600));
+        $this->assertEquals('1:30:45', cablecast_format_runtime(5445));
+    }
 }

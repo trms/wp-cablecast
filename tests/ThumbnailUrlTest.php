@@ -103,17 +103,36 @@ class ThumbnailUrlTest extends WP_UnitTestCase {
     }
 
     /**
-     * Test thumbnail URL fallback when no saved URL exists.
+     * Test thumbnail URL returns empty when no saved URL exists.
+     *
+     * Previously the function would construct a fallback URL, but this caused
+     * broken images when shows don't have thumbnails on the server.
      */
-    public function test_thumbnail_url_fallback_without_saved_url() {
+    public function test_thumbnail_url_empty_without_saved_url() {
         // Remove the saved thumbnail URL
         delete_post_meta($this->show_post_id, 'cablecast_thumbnail_url');
 
         $url = cablecast_show_thumbnail_url($this->show_post_id, 'medium');
 
-        // Should fall back to constructing URL from server settings
-        $this->assertStringContainsString('https://example.cablecast.net', $url);
-        $this->assertStringContainsString('12345', $url); // show_id
+        // Should return empty - no fallback URL construction
+        $this->assertEmpty($url);
+    }
+
+    /**
+     * Test thumbnail URL uses remote URL even in local mode when no featured image.
+     */
+    public function test_thumbnail_url_remote_fallback_in_local_mode() {
+        // Switch to local mode
+        update_option('cablecast_options', [
+            'server' => 'https://example.cablecast.net',
+            'thumbnail_mode' => 'local'
+        ]);
+
+        // With cablecast_thumbnail_url meta but no WordPress featured image,
+        // should fall back to the remote URL
+        $url = cablecast_show_thumbnail_url($this->show_post_id, 'medium');
+
+        $this->assertStringContainsString('https://example.cablecast.net/cablecastapi/dynamicthumbnails/99999', $url);
     }
 
     /**

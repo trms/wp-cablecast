@@ -1,6 +1,113 @@
 <?php
 
 /**
+ * Admin notice for home page setup.
+ *
+ * Shows a dismissible notice prompting users to create a Cablecast home page
+ * if a server is configured but no home page exists yet.
+ */
+add_action('admin_notices', function() {
+    // Only show to users who can manage options
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+
+    // Check if dismissed
+    if (get_option('cablecast_home_page_notice_dismissed')) {
+        return;
+    }
+
+    // Check if server is configured
+    $options = get_option('cablecast_options', []);
+    if (empty($options['server'])) {
+        return;
+    }
+
+    // Check if home page already exists
+    $existing_page = get_posts([
+        'post_type' => 'page',
+        'post_status' => 'any',
+        'meta_query' => [[
+            'key' => '_wp_page_template',
+            'value' => 'cablecast-home',
+        ]],
+        'posts_per_page' => 1,
+    ]);
+
+    if (!empty($existing_page)) {
+        return;
+    }
+
+    // Check if there are any shows synced (to avoid showing notice before first sync)
+    $shows = get_posts([
+        'post_type' => 'show',
+        'posts_per_page' => 1,
+        'fields' => 'ids',
+    ]);
+
+    if (empty($shows)) {
+        return;
+    }
+
+    $settings_url = admin_url('options-general.php?page=cablecast#cablecast_section_home_page');
+    ?>
+    <div class="notice notice-info is-dismissible" id="cablecast-home-page-notice">
+        <p>
+            <strong><?php _e('Cablecast:', 'cablecast'); ?></strong>
+            <?php _e('Create a home page to showcase your TV station\'s content!', 'cablecast'); ?>
+            <a href="<?php echo esc_url($settings_url); ?>" class="button button-primary" style="margin-left: 10px;">
+                <?php _e('Set Up Home Page', 'cablecast'); ?>
+            </a>
+        </p>
+    </div>
+    <script>
+    jQuery(function($) {
+        $(document).on('click', '#cablecast-home-page-notice .notice-dismiss', function() {
+            $.ajax({
+                url: ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'cablecast_dismiss_home_notice',
+                    nonce: '<?php echo wp_create_nonce('cablecast_dismiss_home_notice'); ?>'
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+});
+
+// AJAX handler for dismissing home page notice
+add_action('wp_ajax_cablecast_dismiss_home_notice', function() {
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'cablecast_dismiss_home_notice')) {
+        wp_send_json_error();
+    }
+
+    update_option('cablecast_home_page_notice_dismissed', true);
+    wp_send_json_success();
+});
+
+/**
+ * Get all custom field taxonomies (cbl-tax-*).
+ *
+ * These are dynamically registered taxonomies from Cablecast show fields.
+ *
+ * @return array List of taxonomy names.
+ */
+function cablecast_get_custom_taxonomies() {
+    $custom_taxonomies = [];
+    $all_taxonomies = get_taxonomies([], 'names');
+
+    foreach ($all_taxonomies as $tax_name) {
+        if (strpos($tax_name, 'cbl-tax-') === 0) {
+            $custom_taxonomies[] = $tax_name;
+        }
+    }
+
+    return $custom_taxonomies;
+}
+
+/**
  * custom option and settings
  */
 function cablecast_settings_init()
@@ -93,6 +200,30 @@ function cablecast_settings_init()
         'cablecast_field_category_colors_cb',
         'cablecast',
         'cablecast_section_shortcodes'
+    );
+
+    // Home Page Settings Section
+    add_settings_section(
+        'cablecast_section_home_page',
+        __('Home Page', 'cablecast'),
+        'cablecast_section_home_page_cb',
+        'cablecast'
+    );
+
+    add_settings_field(
+        'cablecast_field_home_page_sections',
+        __('Home Page Sections', 'cablecast'),
+        'cablecast_field_home_page_sections_cb',
+        'cablecast',
+        'cablecast_section_home_page'
+    );
+
+    add_settings_field(
+        'cablecast_field_home_page_create',
+        __('Quick Setup', 'cablecast'),
+        'cablecast_field_home_page_create_cb',
+        'cablecast',
+        'cablecast_section_home_page'
     );
 
     // Maintenance Section
@@ -594,6 +725,219 @@ add_filter('pre_update_option_cablecast_options', function($value, $old_value) {
     return $value;
 }, 10, 2);
 
+// Home Page settings callbacks
+function cablecast_section_home_page_cb($args)
+{
+    ?>
+    <p><?php _e('Configure the Cablecast home page shortcode. Use <code>[cablecast_home]</code> on any page or assign the "Cablecast Home" page template.', 'cablecast'); ?></p>
+    <?php
+}
+
+function cablecast_field_home_page_sections_cb($args)
+{
+    $options = get_option('cablecast_options');
+    $home = isset($options['home_page']) ? $options['home_page'] : [];
+
+    $show_now_playing = isset($home['show_now_playing']) ? $home['show_now_playing'] : true;
+    $show_schedule = isset($home['show_schedule']) ? $home['show_schedule'] : true;
+    $schedule_days = isset($home['schedule_days']) ? $home['schedule_days'] : 7;
+    $show_recent = isset($home['show_recent']) ? $home['show_recent'] : true;
+    $recent_count = isset($home['recent_count']) ? $home['recent_count'] : 12;
+    $show_browse = isset($home['show_browse']) ? $home['show_browse'] : true;
+    ?>
+    <fieldset>
+        <label style="display: block; margin-bottom: 10px;">
+            <input type="checkbox" name="cablecast_options[home_page][show_now_playing]" value="1" <?php checked($show_now_playing); ?>>
+            <?php _e('Now Playing - Show what\'s currently on air', 'cablecast'); ?>
+        </label>
+
+        <label style="display: block; margin-bottom: 5px;">
+            <input type="checkbox" name="cablecast_options[home_page][show_schedule]" value="1" <?php checked($show_schedule); ?>>
+            <?php _e('Weekly Schedule - Display schedule grid', 'cablecast'); ?>
+        </label>
+        <p style="margin-left: 24px; margin-top: 0; margin-bottom: 10px;">
+            <label>
+                <?php _e('Days to show:', 'cablecast'); ?>
+                <input type="number" name="cablecast_options[home_page][schedule_days]" value="<?php echo esc_attr($schedule_days); ?>" min="1" max="14" style="width: 60px;">
+            </label>
+        </p>
+
+        <label style="display: block; margin-bottom: 5px;">
+            <input type="checkbox" name="cablecast_options[home_page][show_recent]" value="1" <?php checked($show_recent); ?>>
+            <?php _e('Recent Shows - Gallery of newest content', 'cablecast'); ?>
+        </label>
+        <p style="margin-left: 24px; margin-top: 0; margin-bottom: 10px;">
+            <label>
+                <?php _e('Number of shows:', 'cablecast'); ?>
+                <input type="number" name="cablecast_options[home_page][recent_count]" value="<?php echo esc_attr($recent_count); ?>" min="4" max="24" style="width: 60px;">
+            </label>
+        </p>
+
+        <label style="display: block; margin-bottom: 10px;">
+            <input type="checkbox" name="cablecast_options[home_page][show_browse]" value="1" <?php checked($show_browse); ?>>
+            <?php _e('Browse - Series, categories, and producers', 'cablecast'); ?>
+        </label>
+    </fieldset>
+    <?php
+}
+
+function cablecast_field_home_page_create_cb($args)
+{
+    // Check if a home page already exists
+    $existing_page = get_posts([
+        'post_type' => 'page',
+        'post_status' => 'any',
+        'meta_query' => [[
+            'key' => '_wp_page_template',
+            'value' => 'cablecast-home',
+        ]],
+        'posts_per_page' => 1,
+    ]);
+
+    if (!empty($existing_page)) {
+        $page = $existing_page[0];
+        $edit_link = get_edit_post_link($page->ID);
+        $view_link = get_permalink($page->ID);
+        ?>
+        <div class="notice notice-success inline" style="margin: 0; padding: 10px;">
+            <p>
+                <span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span>
+                <?php printf(__('Home page exists: <strong>%s</strong>', 'cablecast'), esc_html($page->post_title)); ?>
+                (<a href="<?php echo esc_url($edit_link); ?>"><?php _e('Edit', 'cablecast'); ?></a> |
+                <a href="<?php echo esc_url($view_link); ?>" target="_blank"><?php _e('View', 'cablecast'); ?></a>)
+            </p>
+        </div>
+        <?php
+        return;
+    }
+    ?>
+    <button type="button" id="cablecast-create-home-page" class="button button-primary">
+        <?php _e('Create Home Page', 'cablecast'); ?>
+    </button>
+    <span id="cablecast-create-home-status" style="margin-left: 10px;"></span>
+    <p class="description" style="margin-top: 8px;">
+        <?php _e('Creates a new page with the Cablecast Home template. You can then set it as your site\'s front page in Settings > Reading.', 'cablecast'); ?>
+    </p>
+
+    <script>
+    jQuery(function($) {
+        $('#cablecast-create-home-page').on('click', function() {
+            var $btn = $(this);
+            var $status = $('#cablecast-create-home-status');
+
+            $btn.prop('disabled', true);
+            $status.html('<span class="spinner is-active" style="float: none; margin: 0;"></span> <?php _e('Creating...', 'cablecast'); ?>');
+
+            $.ajax({
+                url: ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'cablecast_create_home_page',
+                    nonce: '<?php echo wp_create_nonce('cablecast_create_home_page'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $status.html('<span style="color: #46b450;"><?php _e('Created!', 'cablecast'); ?></span>');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        $status.html('<span style="color: #dc3232;">' + response.data + '</span>');
+                        $btn.prop('disabled', false);
+                    }
+                },
+                error: function() {
+                    $status.html('<span style="color: #dc3232;"><?php _e('Error creating page', 'cablecast'); ?></span>');
+                    $btn.prop('disabled', false);
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// AJAX handler for creating home page
+add_action('wp_ajax_cablecast_create_home_page', function() {
+    if (!current_user_can('edit_pages')) {
+        wp_send_json_error(__('Permission denied', 'cablecast'));
+    }
+
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'cablecast_create_home_page')) {
+        wp_send_json_error(__('Invalid nonce', 'cablecast'));
+    }
+
+    // Build modular page content with individual shortcodes
+    $page_content = <<<CONTENT
+<!-- wp:heading -->
+<h2>Now Playing</h2>
+<!-- /wp:heading -->
+
+<!-- wp:shortcode -->
+[cablecast_now_playing show_up_next="true" show_thumbnail="true" show_description="true" exclude_filler="true"]
+<!-- /wp:shortcode -->
+
+<!-- wp:heading -->
+<h2>This Week's Schedule</h2>
+<!-- /wp:heading -->
+
+<!-- wp:shortcode -->
+[cablecast_weekly_guide days="7" show_channel_switcher="true" show_category_colors="true"]
+<!-- /wp:shortcode -->
+
+<!-- wp:heading -->
+<h2>Recent Shows</h2>
+<!-- /wp:heading -->
+
+<!-- wp:shortcode -->
+[cablecast_shows count="12" layout="featured" columns="4" orderby="date" order="DESC"]
+<!-- /wp:shortcode -->
+
+<!-- wp:heading -->
+<h2>Browse by Series</h2>
+<!-- /wp:heading -->
+
+<!-- wp:shortcode -->
+[cablecast_series count="6" layout="grid" show_thumbnails="true"]
+<!-- /wp:shortcode -->
+
+<!-- wp:heading -->
+<h2>Categories</h2>
+<!-- /wp:heading -->
+
+<!-- wp:shortcode -->
+[cablecast_categories layout="cloud" show_colors="true" show_counts="true"]
+<!-- /wp:shortcode -->
+
+<!-- wp:heading -->
+<h2>Producers</h2>
+<!-- /wp:heading -->
+
+<!-- wp:shortcode -->
+[cablecast_producers count="10" orderby="count" layout="list"]
+<!-- /wp:shortcode -->
+CONTENT;
+
+    $page_id = wp_insert_post([
+        'post_type' => 'page',
+        'post_title' => __('Cablecast Home', 'cablecast'),
+        'post_content' => $page_content,
+        'post_status' => 'publish',
+    ]);
+
+    if (is_wp_error($page_id)) {
+        wp_send_json_error($page_id->get_error_message());
+    }
+
+    // Set the page template
+    update_post_meta($page_id, '_wp_page_template', 'cablecast-home');
+
+    wp_send_json_success([
+        'page_id' => $page_id,
+        'edit_url' => get_edit_post_link($page_id, 'raw'),
+    ]);
+});
+
 // Maintenance section callbacks
 function cablecast_section_maintenance_cb($args)
 {
@@ -822,20 +1166,35 @@ function cablecast_field_clear_all_content_cb($args)
     $show_counts = wp_count_posts('show');
     $show_count = ($show_counts->publish ?? 0) + ($show_counts->draft ?? 0) + ($show_counts->private ?? 0);
 
-    $channel_counts = wp_count_posts('channel');
+    $channel_counts = wp_count_posts('cablecast_channel');
     $channel_count = ($channel_counts->publish ?? 0) + ($channel_counts->draft ?? 0);
 
-    $project_counts = wp_count_posts('project');
-    $project_count = ($project_counts->publish ?? 0) + ($project_counts->draft ?? 0);
+    // Projects and Producers are taxonomies, not post types
+    $project_count = wp_count_terms(['taxonomy' => 'cablecast_project', 'hide_empty' => false]);
+    if (is_wp_error($project_count)) {
+        $project_count = 0;
+    }
 
-    $producer_counts = wp_count_posts('producer');
-    $producer_count = ($producer_counts->publish ?? 0) + ($producer_counts->draft ?? 0);
+    $producer_count = wp_count_terms(['taxonomy' => 'cablecast_producer', 'hide_empty' => false]);
+    if (is_wp_error($producer_count)) {
+        $producer_count = 0;
+    }
+
+    // Count custom field taxonomy terms
+    $custom_tax_count = 0;
+    $custom_taxonomies = cablecast_get_custom_taxonomies();
+    foreach ($custom_taxonomies as $tax_name) {
+        $count = wp_count_terms(['taxonomy' => $tax_name, 'hide_empty' => false]);
+        if (!is_wp_error($count)) {
+            $custom_tax_count += $count;
+        }
+    }
 
     global $wpdb;
     $table_name = $wpdb->prefix . 'cablecast_schedule_items';
     $schedule_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
 
-    $total_count = $show_count + $channel_count + $project_count + $producer_count + $schedule_count;
+    $total_count = $show_count + $channel_count + $project_count + $producer_count + $custom_tax_count + $schedule_count;
     ?>
     <div style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 15px; max-width: 500px;">
         <p style="margin-top: 0;">
@@ -844,8 +1203,11 @@ function cablecast_field_clear_all_content_cb($args)
         <ul style="margin: 10px 0; padding-left: 20px;">
             <li><?php printf(__('%d Shows (and their thumbnails)', 'cablecast'), $show_count); ?></li>
             <li><?php printf(__('%d Channels', 'cablecast'), $channel_count); ?></li>
-            <li><?php printf(__('%d Projects', 'cablecast'), $project_count); ?></li>
-            <li><?php printf(__('%d Producers', 'cablecast'), $producer_count); ?></li>
+            <li><?php printf(__('%d Series terms', 'cablecast'), $project_count); ?></li>
+            <li><?php printf(__('%d Producer terms', 'cablecast'), $producer_count); ?></li>
+            <?php if ($custom_tax_count > 0) : ?>
+            <li><?php printf(__('%d Custom field terms', 'cablecast'), $custom_tax_count); ?></li>
+            <?php endif; ?>
             <li><?php printf(__('%d Schedule Items', 'cablecast'), $schedule_count); ?></li>
         </ul>
         <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
@@ -925,7 +1287,7 @@ add_action('wp_ajax_cablecast_clear_all_content', function() {
     }
 
     global $wpdb;
-    $deleted = ['shows' => 0, 'channels' => 0, 'projects' => 0, 'producers' => 0, 'schedule' => 0];
+    $deleted = ['shows' => 0, 'channels' => 0, 'series' => 0, 'producers' => 0, 'custom_terms' => 0, 'schedule' => 0];
 
     // Delete shows (with thumbnails)
     $shows = get_posts([
@@ -944,9 +1306,9 @@ add_action('wp_ajax_cablecast_clear_all_content', function() {
         $deleted['shows']++;
     }
 
-    // Delete channels
+    // Delete channels (correct post type is cablecast_channel)
     $channels = get_posts([
-        'post_type' => 'channel',
+        'post_type' => 'cablecast_channel',
         'posts_per_page' => -1,
         'post_status' => 'any',
         'fields' => 'ids',
@@ -956,28 +1318,46 @@ add_action('wp_ajax_cablecast_clear_all_content', function() {
         $deleted['channels']++;
     }
 
-    // Delete projects
-    $projects = get_posts([
-        'post_type' => 'project',
-        'posts_per_page' => -1,
-        'post_status' => 'any',
+    // Delete series/project taxonomy terms
+    $series_terms = get_terms([
+        'taxonomy' => 'cablecast_project',
+        'hide_empty' => false,
         'fields' => 'ids',
     ]);
-    foreach ($projects as $project_id) {
-        wp_delete_post($project_id, true);
-        $deleted['projects']++;
+    if (!is_wp_error($series_terms)) {
+        foreach ($series_terms as $term_id) {
+            wp_delete_term($term_id, 'cablecast_project');
+            $deleted['series']++;
+        }
     }
 
-    // Delete producers
-    $producers = get_posts([
-        'post_type' => 'producer',
-        'posts_per_page' => -1,
-        'post_status' => 'any',
+    // Delete producer taxonomy terms
+    $producer_terms = get_terms([
+        'taxonomy' => 'cablecast_producer',
+        'hide_empty' => false,
         'fields' => 'ids',
     ]);
-    foreach ($producers as $producer_id) {
-        wp_delete_post($producer_id, true);
-        $deleted['producers']++;
+    if (!is_wp_error($producer_terms)) {
+        foreach ($producer_terms as $term_id) {
+            wp_delete_term($term_id, 'cablecast_producer');
+            $deleted['producers']++;
+        }
+    }
+
+    // Delete custom field taxonomy terms (cbl-tax-*)
+    $custom_taxonomies = cablecast_get_custom_taxonomies();
+    foreach ($custom_taxonomies as $tax_name) {
+        $custom_terms = get_terms([
+            'taxonomy' => $tax_name,
+            'hide_empty' => false,
+            'fields' => 'ids',
+        ]);
+        if (!is_wp_error($custom_terms)) {
+            foreach ($custom_terms as $term_id) {
+                wp_delete_term($term_id, $tax_name);
+                $deleted['custom_terms']++;
+            }
+        }
     }
 
     // Clear schedule table
@@ -991,11 +1371,12 @@ add_action('wp_ajax_cablecast_clear_all_content', function() {
     update_option('cablecast_sync_total_result_count', 0);
 
     $message = sprintf(
-        __('Deleted %d shows, %d channels, %d projects, %d producers, %d schedule items. Sync state reset.', 'cablecast'),
+        __('Deleted %d shows, %d channels, %d series, %d producers, %d custom terms, %d schedule items. Sync state reset.', 'cablecast'),
         $deleted['shows'],
         $deleted['channels'],
-        $deleted['projects'],
+        $deleted['series'],
         $deleted['producers'],
+        $deleted['custom_terms'],
         $deleted['schedule']
     );
 

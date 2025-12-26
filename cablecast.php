@@ -111,6 +111,7 @@ require_once( dirname( __FILE__ ) . '/includes/sync.php' );
 require_once( dirname( __FILE__ ) . '/includes/cron.php' );
 require_once( dirname( __FILE__ ) . '/includes/content.php' );
 require_once( dirname( __FILE__ ) . '/includes/shortcodes.php' );
+require_once( dirname( __FILE__ ) . '/includes/template-loader.php' );
 require_once( dirname( __FILE__ ) . '/display.php' );
 require_once( dirname( __FILE__ ) . '/theme-functions.php' );
 

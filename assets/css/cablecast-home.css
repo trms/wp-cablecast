@@ -1,0 +1,416 @@
+/**
+ * Cablecast Home Page Styles
+ *
+ * "Broadcast Modern" design system for the home page shortcode.
+ * Professional, clean layout inspired by streaming services and modern news broadcasts.
+ */
+
+/* ==========================================================================
+   CSS Custom Properties (Theme Variables)
+   ========================================================================== */
+
+.cablecast-home {
+    /* Typography */
+    --cablecast-font-display: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --cablecast-font-body: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+
+    /* Colors - Light Mode */
+    --cablecast-home-bg: #f8fafc;
+    --cablecast-home-surface: #ffffff;
+    --cablecast-home-text: #1e293b;
+    --cablecast-home-text-secondary: #64748b;
+    --cablecast-home-muted: #94a3b8;
+    --cablecast-home-accent: #f59e0b;
+    --cablecast-home-accent-bg: rgba(245, 158, 11, 0.1);
+    --cablecast-home-live: #ef4444;
+    --cablecast-home-border: #e2e8f0;
+    --cablecast-home-border-light: #f1f5f9;
+
+    /* Spacing */
+    --cablecast-section-gap: 3rem;
+
+    /* Shadows */
+    --cablecast-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --cablecast-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    --cablecast-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+    /* Borders */
+    --cablecast-radius: 0.5rem;
+    --cablecast-radius-lg: 0.75rem;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .cablecast-home {
+        --cablecast-home-bg: #0f172a;
+        --cablecast-home-surface: #1e293b;
+        --cablecast-home-text: #f1f5f9;
+        --cablecast-home-text-secondary: #94a3b8;
+        --cablecast-home-muted: #64748b;
+        --cablecast-home-border: #334155;
+        --cablecast-home-border-light: #1e293b;
+    }
+}
+
+/* ==========================================================================
+   Google Fonts
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+/* ==========================================================================
+   Base Layout
+   ========================================================================== */
+
+.cablecast-home {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    font-family: var(--cablecast-font-body);
+    color: var(--cablecast-home-text);
+    background: var(--cablecast-home-bg);
+}
+
+/* ==========================================================================
+   Section Styling
+   ========================================================================== */
+
+.cablecast-home__section {
+    margin-bottom: var(--cablecast-section-gap);
+}
+
+.cablecast-home__section:last-child {
+    margin-bottom: 0;
+}
+
+.cablecast-home__section-heading {
+    font-family: var(--cablecast-font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--cablecast-home-text);
+    margin: 0 0 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--cablecast-home-border);
+    letter-spacing: -0.025em;
+}
+
+/* ==========================================================================
+   Now Playing Section
+   ========================================================================== */
+
+.cablecast-home__section--now-playing {
+    /* Hero styling */
+}
+
+.cablecast-home__channel-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.cablecast-home__channel-tab {
+    padding: 0.5rem 1rem;
+    background: var(--cablecast-home-surface);
+    border: 1px solid var(--cablecast-home-border);
+    border-radius: 9999px;
+    font-family: var(--cablecast-font-body);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--cablecast-home-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cablecast-home__channel-tab:hover {
+    background: var(--cablecast-home-border-light);
+    border-color: var(--cablecast-home-muted);
+}
+
+.cablecast-home__channel-tab--active {
+    background: var(--cablecast-home-accent);
+    border-color: var(--cablecast-home-accent);
+    color: white;
+}
+
+.cablecast-home__channel-tab--active:hover {
+    background: var(--cablecast-home-accent);
+    border-color: var(--cablecast-home-accent);
+}
+
+.cablecast-home__now-playing-content {
+    /* Container for the now_playing shortcode output */
+}
+
+/* Enhanced now playing card styling for home page */
+.cablecast-home__section--now-playing .cablecast-now-playing {
+    gap: 1.5rem;
+}
+
+.cablecast-home__section--now-playing .cablecast-now-playing__card {
+    background: var(--cablecast-home-surface);
+    border-radius: var(--cablecast-radius-lg);
+    box-shadow: var(--cablecast-shadow);
+    border-top: 4px solid var(--cablecast-home-border);
+}
+
+.cablecast-home__section--now-playing .cablecast-now-playing__card--now {
+    border-top-color: var(--cablecast-home-live);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Live badge enhancement */
+.cablecast-home__section--now-playing .cablecast-now-playing__badge--live {
+    background: var(--cablecast-home-live);
+    color: white;
+    animation: cablecast-live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes cablecast-live-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+}
+
+.cablecast-home__section--now-playing .cablecast-now-playing__card--next {
+    border-top-color: var(--cablecast-home-accent);
+}
+
+/* ==========================================================================
+   Schedule Section
+   ========================================================================== */
+
+.cablecast-home__section--schedule {
+    /* Weekly guide wrapper */
+}
+
+/* Enhanced weekly guide for home page */
+.cablecast-home__section--schedule .cablecast-weekly-guide {
+    background: var(--cablecast-home-surface);
+    border-radius: var(--cablecast-radius-lg);
+    box-shadow: var(--cablecast-shadow);
+    overflow: hidden;
+}
+
+.cablecast-home__section--schedule .cablecast-weekly-guide__channel-switcher {
+    background: var(--cablecast-home-border-light);
+    border-bottom: 1px solid var(--cablecast-home-border);
+}
+
+.cablecast-home__section--schedule .cablecast-weekly-guide__day--today {
+    background: var(--cablecast-home-accent-bg);
+}
+
+.cablecast-home__section--schedule .cablecast-weekly-guide__day--today .cablecast-weekly-guide__day-header {
+    background: var(--cablecast-home-accent);
+    color: white;
+}
+
+.cablecast-home__section--schedule .cablecast-weekly-guide__day--today .cablecast-weekly-guide__day-name,
+.cablecast-home__section--schedule .cablecast-weekly-guide__day--today .cablecast-weekly-guide__day-date {
+    color: inherit;
+}
+
+/* ==========================================================================
+   Recent Shows Section
+   ========================================================================== */
+
+.cablecast-home__section--recent {
+    /* Recent shows wrapper */
+}
+
+/* Enhanced shows grid for home page */
+.cablecast-home__section--recent .cablecast-shows {
+    gap: 1.25rem;
+}
+
+.cablecast-home__section--recent .cablecast-shows__item {
+    background: var(--cablecast-home-surface);
+    border-radius: var(--cablecast-radius);
+    box-shadow: var(--cablecast-shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.cablecast-home__section--recent .cablecast-shows__item:hover {
+    box-shadow: var(--cablecast-shadow-lg);
+    transform: translateY(-2px);
+}
+
+.cablecast-home__section--recent .cablecast-shows__title {
+    font-family: var(--cablecast-font-display);
+}
+
+/* View all link */
+.cablecast-home__view-all {
+    text-align: center;
+    margin-top: 1.5rem;
+}
+
+.cablecast-home__view-all-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--cablecast-home-surface);
+    border: 1px solid var(--cablecast-home-border);
+    border-radius: 9999px;
+    font-family: var(--cablecast-font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--cablecast-home-text);
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.cablecast-home__view-all-link:hover {
+    background: var(--cablecast-home-accent);
+    border-color: var(--cablecast-home-accent);
+    color: white;
+    text-decoration: none;
+}
+
+/* ==========================================================================
+   Browse Section
+   ========================================================================== */
+
+.cablecast-home__section--browse {
+    /* Browse section wrapper */
+}
+
+.cablecast-home__browse-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .cablecast-home__browse-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .cablecast-home__browse-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cablecast-home__browse-section {
+    background: var(--cablecast-home-surface);
+    border-radius: var(--cablecast-radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--cablecast-shadow-sm);
+}
+
+.cablecast-home__browse-heading {
+    font-family: var(--cablecast-font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--cablecast-home-text);
+    margin: 0 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--cablecast-home-border);
+}
+
+.cablecast-home__browse-link {
+    display: inline-block;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--cablecast-home-accent);
+    text-decoration: none;
+}
+
+.cablecast-home__browse-link:hover {
+    text-decoration: underline;
+}
+
+/* Enhanced series cards in browse section */
+.cablecast-home__browse-section .cablecast-series {
+    gap: 0.75rem;
+}
+
+.cablecast-home__browse-section .cablecast-series--grid {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.cablecast-home__browse-section .cablecast-series__item {
+    box-shadow: none;
+    border: 1px solid var(--cablecast-home-border);
+}
+
+/* Enhanced producers list in browse section */
+.cablecast-home__browse-section .cablecast-producers {
+    gap: 0.5rem;
+}
+
+.cablecast-home__browse-section .cablecast-producers__item {
+    background: transparent;
+    padding: 0.5rem 0;
+    box-shadow: none;
+    border-bottom: 1px solid var(--cablecast-home-border-light);
+}
+
+.cablecast-home__browse-section .cablecast-producers__item:last-child {
+    border-bottom: none;
+}
+
+/* Enhanced categories in browse section */
+.cablecast-home__browse-section .cablecast-categories {
+    gap: 0.5rem;
+}
+
+.cablecast-home__browse-section .cablecast-categories__item {
+    font-size: 0.8125rem;
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .cablecast-home {
+        padding: 1.5rem 1rem;
+        --cablecast-section-gap: 2rem;
+    }
+
+    .cablecast-home__section-heading {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .cablecast-home {
+        padding: 1rem 0.75rem;
+        --cablecast-section-gap: 1.5rem;
+    }
+
+    .cablecast-home__section-heading {
+        font-size: 1.125rem;
+    }
+
+    .cablecast-home__channel-tabs {
+        justify-content: center;
+    }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+    .cablecast-home {
+        background: white;
+        color: black;
+    }
+
+    .cablecast-home__channel-tabs,
+    .cablecast-home__view-all,
+    .cablecast-home__browse-link {
+        display: none;
+    }
+}

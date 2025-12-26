@@ -47,6 +47,9 @@ function cablecast_register_shortcodes() {
     add_shortcode('cablecast_producers', 'cablecast_producers_shortcode');
     add_shortcode('cablecast_series', 'cablecast_series_shortcode');
     add_shortcode('cablecast_schedule_calendar', 'cablecast_schedule_calendar_shortcode');
+    add_shortcode('cablecast_upcoming_runs', 'cablecast_upcoming_runs_shortcode');
+    add_shortcode('cablecast_categories', 'cablecast_categories_shortcode');
+    add_shortcode('cablecast_home', 'cablecast_home_shortcode');
 }
 add_action('init', 'cablecast_register_shortcodes');
 
@@ -75,6 +78,16 @@ function cablecast_enqueue_shortcode_assets() {
             [],
             filemtime(plugin_dir_path(__FILE__) . '../assets/css/shortcodes.css')
         );
+
+        // Enqueue home page CSS if home shortcode was used
+        if (in_array('home', $cablecast_shortcodes_used)) {
+            wp_enqueue_style(
+                'cablecast-home',
+                plugins_url('../assets/css/cablecast-home.css', __FILE__),
+                ['cablecast-shortcodes'],
+                filemtime(plugin_dir_path(__FILE__) . '../assets/css/cablecast-home.css')
+            );
+        }
     }
 
     // Enqueue JS if weekly guide was used
@@ -889,11 +902,11 @@ function cablecast_shows_shortcode($atts) {
     }
 
     // Build output
-    $layout = in_array($atts['layout'], ['grid', 'list']) ? $atts['layout'] : 'grid';
+    $layout = in_array($atts['layout'], ['grid', 'list', 'featured']) ? $atts['layout'] : 'grid';
     $columns = min(6, max(2, absint($atts['columns'])));
 
     $classes = ['cablecast-shows', 'cablecast-shows--' . $layout];
-    if ($layout === 'grid') {
+    if ($layout === 'grid' || $layout === 'featured') {
         $classes[] = 'cablecast-shows--columns-' . $columns;
     }
     if (!empty($atts['class'])) {
@@ -902,27 +915,55 @@ function cablecast_shows_shortcode($atts) {
 
     $output = '<div class="' . implode(' ', $classes) . '">';
 
+    $item_index = 0;
     while ($query->have_posts()) {
         $query->the_post();
         $show_id = get_the_ID();
 
-        $output .= '<div class="cablecast-shows__item">';
+        // Featured layout: first item is large
+        $item_classes = ['cablecast-shows__item'];
+        if ($layout === 'featured' && $item_index === 0) {
+            $item_classes[] = 'cablecast-shows__item--featured';
+        }
+        $item_index++;
 
-        // Thumbnail
-        $thumbnail_url = cablecast_show_thumbnail_url($show_id, 'medium');
+        $output .= '<div class="' . implode(' ', $item_classes) . '">';
+
+        // Thumbnail - use larger size for featured item
+        $is_featured_item = ($layout === 'featured' && $item_index === 1);
+        $thumb_size = $is_featured_item ? 'large' : 'medium';
+        $thumbnail_url = cablecast_show_thumbnail_url($show_id, $thumb_size);
         if ($thumbnail_url) {
             $output .= '<a href="' . get_permalink() . '" class="cablecast-shows__thumbnail">';
             $output .= '<img src="' . esc_url($thumbnail_url) . '" alt="' . esc_attr(get_the_title()) . '" loading="lazy" />';
+
+            // Runtime badge overlay
+            $runtime = (int) get_post_meta($show_id, 'cablecast_show_trt', true);
+            if ($runtime > 0) {
+                $output .= '<span class="cablecast-shows__runtime-badge">' . cablecast_format_runtime($runtime) . '</span>';
+            }
+
             $output .= '</a>';
         }
 
         $output .= '<div class="cablecast-shows__content">';
         $output .= '<a href="' . get_permalink() . '" class="cablecast-shows__title">' . esc_html(get_the_title()) . '</a>';
 
-        // Runtime
+        // Runtime (text version, for list layout)
         $runtime = (int) get_post_meta($show_id, 'cablecast_show_trt', true);
-        if ($runtime > 0) {
+        if ($runtime > 0 && $layout === 'list') {
             $output .= '<span class="cablecast-shows__runtime">' . cablecast_format_runtime($runtime) . '</span>';
+        }
+
+        // Category tag
+        $categories = get_the_terms($show_id, 'category');
+        if ($categories && !is_wp_error($categories)) {
+            $cat = $categories[0];
+            $color = cablecast_get_show_category_color($show_id);
+            $style = $color ? ' style="border-color: ' . esc_attr($color) . ';"' : '';
+            $output .= '<a href="' . get_term_link($cat) . '" class="cablecast-shows__category"' . $style . '>';
+            $output .= esc_html($cat->name);
+            $output .= '</a>';
         }
 
         $output .= '</div>'; // content
@@ -1362,10 +1403,11 @@ function cablecast_series_shortcode($atts) {
         $output .= '<div class="cablecast-series__item">';
 
         // Get a thumbnail from a show in this series
+        // Try multiple shows to find one with a valid thumbnail
         if ($show_thumbnails) {
             $shows = get_posts([
                 'post_type' => 'show',
-                'posts_per_page' => 1,
+                'posts_per_page' => 5, // Try up to 5 shows
                 'tax_query' => [[
                     'taxonomy' => 'cablecast_project',
                     'field' => 'term_id',
@@ -1373,13 +1415,18 @@ function cablecast_series_shortcode($atts) {
                 ]],
             ]);
 
-            if (!empty($shows)) {
-                $thumbnail_url = cablecast_show_thumbnail_url($shows[0]->ID, 'medium');
+            $thumbnail_url = '';
+            foreach ($shows as $show) {
+                $thumbnail_url = cablecast_show_thumbnail_url($show->ID, 'medium');
                 if ($thumbnail_url) {
-                    $output .= '<a href="' . get_term_link($term) . '" class="cablecast-series__thumbnail">';
-                    $output .= '<img src="' . esc_url($thumbnail_url) . '" alt="' . esc_attr($term->name) . '" loading="lazy" />';
-                    $output .= '</a>';
+                    break; // Found a valid thumbnail
                 }
+            }
+
+            if ($thumbnail_url) {
+                $output .= '<a href="' . get_term_link($term) . '" class="cablecast-series__thumbnail">';
+                $output .= '<img src="' . esc_url($thumbnail_url) . '" alt="' . esc_attr($term->name) . '" loading="lazy" />';
+                $output .= '</a>';
             }
         }
 
@@ -1546,4 +1593,453 @@ function cablecast_schedule_calendar_shortcode($atts) {
     }
 
     return '<div id="' . esc_attr($calendar_id) . '" class="' . implode(' ', $classes) . '"></div>';
+}
+
+// ============================================================================
+// UPCOMING RUNS SHORTCODE
+// ============================================================================
+
+/**
+ * [cablecast_upcoming_runs] - Display upcoming airings for a show across all channels.
+ *
+ * Shows a list of upcoming scheduled airings for a specific show,
+ * displaying the date, time, and channel for each airing.
+ *
+ * @param array $atts Shortcode attributes:
+ *   - id: Show post ID (optional, defaults to current post)
+ *   - count: Number of upcoming runs to display (default: 5)
+ *   - show_channel: Display channel name with link (default: true)
+ *   - show_date: Display date and time (default: true)
+ *   - days_ahead: How many days ahead to look (default: 14)
+ *   - class: Additional CSS class
+ * @return string HTML output
+ */
+function cablecast_upcoming_runs_shortcode($atts) {
+    cablecast_mark_shortcode_used('upcoming_runs');
+
+    $atts = shortcode_atts([
+        'id'           => '',
+        'count'        => 5,
+        'show_channel' => 'true',
+        'show_date'    => 'true',
+        'days_ahead'   => 14,
+        'class'        => '',
+    ], $atts, 'cablecast_upcoming_runs');
+
+    // Determine show ID
+    $show_id = absint($atts['id']);
+    if (!$show_id) {
+        $show_id = cablecast_current_show_post_id();
+    }
+
+    if (!$show_id) {
+        return ''; // Silent fail - no context
+    }
+
+    // Verify it's a show post
+    $post = get_post($show_id);
+    if (!$post || $post->post_type !== 'show') {
+        return '';
+    }
+
+    global $wpdb;
+    $table = $wpdb->prefix . 'cablecast_schedule_items';
+
+    // Get timezone
+    $timezone = get_option('timezone_string');
+    if (empty($timezone)) {
+        $timezone = 'UTC';
+    }
+
+    // Calculate date range in UTC
+    try {
+        $now = new DateTime('now', new DateTimeZone($timezone));
+        $now->setTimezone(new DateTimeZone('UTC'));
+        $now_utc = $now->format('Y-m-d H:i:s');
+
+        $end = new DateTime('now', new DateTimeZone($timezone));
+        $end->modify('+' . absint($atts['days_ahead']) . ' days');
+        $end->setTimezone(new DateTimeZone('UTC'));
+        $end_utc = $end->format('Y-m-d H:i:s');
+    } catch (Exception $e) {
+        return '';
+    }
+
+    $count = absint($atts['count']) ?: 5;
+
+    /**
+     * Filter the query arguments for upcoming runs.
+     *
+     * @param array $args Query parameters.
+     * @param int   $show_id The show post ID.
+     */
+    $query_args = apply_filters('cablecast_upcoming_runs_args', [
+        'show_post_id' => $show_id,
+        'start_utc'    => $now_utc,
+        'end_utc'      => $end_utc,
+        'count'        => $count,
+    ], $show_id);
+
+    // Query upcoming runs
+    $runs = $wpdb->get_results($wpdb->prepare(
+        "SELECT * FROM $table
+         WHERE show_post_id = %d
+         AND cg_exempt = 0
+         AND run_date_time >= %s
+         AND run_date_time < %s
+         ORDER BY run_date_time ASC
+         LIMIT %d",
+        $query_args['show_post_id'],
+        $query_args['start_utc'],
+        $query_args['end_utc'],
+        $query_args['count']
+    ));
+
+    if (empty($runs)) {
+        return ''; // Silent fail - no upcoming runs
+    }
+
+    // Parse boolean options
+    $show_channel = filter_var($atts['show_channel'], FILTER_VALIDATE_BOOLEAN);
+    $show_date = filter_var($atts['show_date'], FILTER_VALIDATE_BOOLEAN);
+
+    // Build output
+    $classes = ['cablecast-upcoming-runs'];
+    if (!empty($atts['class'])) {
+        $classes[] = esc_attr($atts['class']);
+    }
+
+    $output = '<div class="' . implode(' ', $classes) . '">';
+
+    /**
+     * Action before upcoming runs heading.
+     *
+     * @param int   $show_id The show post ID.
+     * @param array $runs    The array of run objects.
+     */
+    do_action('cablecast_before_upcoming_runs_heading', $show_id, $runs);
+
+    $output .= '<h3 class="cablecast-upcoming-runs__heading">' . esc_html__('Upcoming Airings', 'cablecast') . '</h3>';
+
+    /**
+     * Action after upcoming runs heading.
+     *
+     * @param int   $show_id The show post ID.
+     * @param array $runs    The array of run objects.
+     */
+    do_action('cablecast_after_upcoming_runs_heading', $show_id, $runs);
+
+    $output .= '<ul class="cablecast-upcoming-runs__list">';
+
+    foreach ($runs as $run) {
+        // Convert UTC time to local timezone for display
+        try {
+            $run_utc = new DateTime($run->run_date_time, new DateTimeZone('UTC'));
+            $run_utc->setTimezone(new DateTimeZone($timezone));
+            $run_local = $run_utc;
+        } catch (Exception $e) {
+            continue;
+        }
+
+        $channel = get_post($run->channel_post_id);
+
+        $output .= '<li class="cablecast-upcoming-runs__item">';
+
+        if ($show_date) {
+            $date_str = $run_local->format('l, F j'); // e.g., "Monday, January 15"
+            $time_str = $run_local->format('g:i A');   // e.g., "7:00 PM"
+            $output .= '<span class="cablecast-upcoming-runs__date">' . esc_html($date_str) . '</span>';
+            $output .= '<span class="cablecast-upcoming-runs__time">' . esc_html($time_str) . '</span>';
+        }
+
+        if ($show_channel && $channel) {
+            $channel_url = get_permalink($channel->ID);
+            $output .= '<a href="' . esc_url($channel_url) . '" class="cablecast-upcoming-runs__channel">';
+            $output .= esc_html($channel->post_title);
+            $output .= '</a>';
+        }
+
+        $output .= '</li>';
+    }
+
+    $output .= '</ul>';
+
+    /**
+     * Action after upcoming runs list.
+     *
+     * @param int   $show_id The show post ID.
+     * @param array $runs    The array of run objects.
+     */
+    do_action('cablecast_after_upcoming_runs_list', $show_id, $runs);
+
+    $output .= '</div>';
+
+    return $output;
+}
+
+// ============================================================================
+// CATEGORIES SHORTCODE
+// ============================================================================
+
+/**
+ * [cablecast_categories] - Display categories that have shows.
+ *
+ * @param array $atts Shortcode attributes
+ * @return string HTML output
+ */
+function cablecast_categories_shortcode($atts) {
+    cablecast_mark_shortcode_used('categories');
+
+    $atts = shortcode_atts([
+        'layout'      => 'cloud',  // cloud, grid, list
+        'show_colors' => 'true',
+        'show_counts' => 'true',
+        'count'       => 0,        // 0 = all
+        'class'       => '',
+    ], $atts, 'cablecast_categories');
+
+    // Get categories that have shows
+    $categories = get_terms([
+        'taxonomy'   => 'category',
+        'hide_empty' => true,
+        'number'     => absint($atts['count']) ?: 0,
+        'orderby'    => 'name',
+        'order'      => 'ASC',
+    ]);
+
+    if (empty($categories) || is_wp_error($categories)) {
+        return '';
+    }
+
+    // Filter to only categories with shows
+    $categories_with_shows = [];
+    foreach ($categories as $cat) {
+        $show_count = new WP_Query([
+            'post_type'      => 'show',
+            'tax_query'      => [[
+                'taxonomy' => 'category',
+                'field'    => 'term_id',
+                'terms'    => $cat->term_id,
+            ]],
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'no_found_rows'  => false,
+        ]);
+
+        if ($show_count->found_posts > 0) {
+            $cat->show_count = $show_count->found_posts;
+            $categories_with_shows[] = $cat;
+        }
+        wp_reset_postdata();
+    }
+
+    if (empty($categories_with_shows)) {
+        return '';
+    }
+
+    // Parse options
+    $layout = in_array($atts['layout'], ['cloud', 'grid', 'list']) ? $atts['layout'] : 'cloud';
+    $show_colors = filter_var($atts['show_colors'], FILTER_VALIDATE_BOOLEAN);
+    $show_counts = filter_var($atts['show_counts'], FILTER_VALIDATE_BOOLEAN);
+
+    // Get category colors from settings
+    $options = get_option('cablecast_options');
+    $category_colors = isset($options['category_colors']) ? $options['category_colors'] : [];
+
+    // Build output
+    $classes = ['cablecast-categories', 'cablecast-categories--' . $layout];
+    if (!empty($atts['class'])) {
+        $classes[] = esc_attr($atts['class']);
+    }
+
+    $output = '<div class="' . implode(' ', $classes) . '">';
+
+    foreach ($categories_with_shows as $cat) {
+        $color = isset($category_colors[$cat->slug]) ? $category_colors[$cat->slug] : null;
+
+        $item_style = '';
+        if ($show_colors && $color) {
+            if ($layout === 'cloud') {
+                $item_style = ' style="background-color: ' . esc_attr($color) . '20; border-color: ' . esc_attr($color) . '; color: ' . esc_attr($color) . ';"';
+            } else {
+                $item_style = ' style="border-left-color: ' . esc_attr($color) . ';"';
+            }
+        }
+
+        $output .= '<a href="' . get_term_link($cat) . '" class="cablecast-categories__item"' . $item_style . '>';
+
+        if ($show_colors && $color && $layout !== 'cloud') {
+            $output .= '<span class="cablecast-categories__color" style="background-color: ' . esc_attr($color) . ';"></span>';
+        }
+
+        $output .= '<span class="cablecast-categories__name">' . esc_html($cat->name) . '</span>';
+
+        if ($show_counts) {
+            $output .= '<span class="cablecast-categories__count">' . $cat->show_count . '</span>';
+        }
+
+        $output .= '</a>';
+    }
+
+    $output .= '</div>';
+
+    return $output;
+}
+
+// ============================================================================
+// HOME PAGE SHORTCODE
+// ============================================================================
+
+/**
+ * [cablecast_home] - Display a complete home page with all sections.
+ *
+ * Composes multiple shortcodes into a cohesive home page layout:
+ * - Now Playing hero section
+ * - Weekly schedule grid
+ * - Recent shows gallery
+ * - Browse by series/category
+ *
+ * @param array $atts Shortcode attributes
+ * @return string HTML output
+ */
+function cablecast_home_shortcode($atts) {
+    cablecast_mark_shortcode_used('home');
+
+    // Get settings
+    $options = get_option('cablecast_options', []);
+    $home_settings = isset($options['home_page']) ? $options['home_page'] : [];
+
+    $atts = shortcode_atts([
+        'show_now_playing' => isset($home_settings['show_now_playing']) ? $home_settings['show_now_playing'] : 'true',
+        'show_schedule'    => isset($home_settings['show_schedule']) ? $home_settings['show_schedule'] : 'true',
+        'schedule_days'    => isset($home_settings['schedule_days']) ? $home_settings['schedule_days'] : 7,
+        'show_recent'      => isset($home_settings['show_recent']) ? $home_settings['show_recent'] : 'true',
+        'recent_count'     => isset($home_settings['recent_count']) ? $home_settings['recent_count'] : 12,
+        'show_browse'      => isset($home_settings['show_browse']) ? $home_settings['show_browse'] : 'true',
+        'class'            => '',
+    ], $atts, 'cablecast_home');
+
+    // Parse booleans
+    $show_now_playing = filter_var($atts['show_now_playing'], FILTER_VALIDATE_BOOLEAN);
+    $show_schedule = filter_var($atts['show_schedule'], FILTER_VALIDATE_BOOLEAN);
+    $show_recent = filter_var($atts['show_recent'], FILTER_VALIDATE_BOOLEAN);
+    $show_browse = filter_var($atts['show_browse'], FILTER_VALIDATE_BOOLEAN);
+
+    // Get channels
+    $channels = cablecast_get_all_channels();
+    $default_channel = !empty($channels) ? $channels[0]->ID : 0;
+
+    // Get section headings from settings
+    $now_playing_heading = isset($home_settings['now_playing_heading']) ? $home_settings['now_playing_heading'] : __('Now Playing', 'cablecast');
+    $schedule_heading = isset($home_settings['schedule_heading']) ? $home_settings['schedule_heading'] : __("This Week's Schedule", 'cablecast');
+    $recent_heading = isset($home_settings['recent_heading']) ? $home_settings['recent_heading'] : __('Recent Shows', 'cablecast');
+    $browse_heading = isset($home_settings['browse_heading']) ? $home_settings['browse_heading'] : __('Browse', 'cablecast');
+
+    // Build output
+    $classes = ['cablecast-home'];
+    if (!empty($atts['class'])) {
+        $classes[] = esc_attr($atts['class']);
+    }
+
+    $output = '<div class="' . implode(' ', $classes) . '">';
+
+    // Section 1: Now Playing Hero
+    if ($show_now_playing && $default_channel) {
+        $output .= '<section class="cablecast-home__section cablecast-home__section--now-playing">';
+        $output .= '<h2 class="cablecast-home__section-heading">' . esc_html($now_playing_heading) . '</h2>';
+
+        // If multiple channels, show tabs
+        if (count($channels) > 1) {
+            $output .= '<div class="cablecast-home__channel-tabs">';
+            foreach ($channels as $index => $channel) {
+                $active = $index === 0 ? ' cablecast-home__channel-tab--active' : '';
+                $output .= '<button type="button" class="cablecast-home__channel-tab' . $active . '" data-channel="' . esc_attr($channel->ID) . '">';
+                $output .= esc_html($channel->post_title);
+                $output .= '</button>';
+            }
+            $output .= '</div>';
+        }
+
+        $output .= '<div class="cablecast-home__now-playing-content">';
+        $output .= do_shortcode('[cablecast_now_playing channel="' . $default_channel . '" show_up_next="true" show_thumbnail="true" show_description="true" exclude_filler="true"]');
+        $output .= '</div>';
+        $output .= '</section>';
+    }
+
+    // Section 2: Weekly Schedule
+    if ($show_schedule && $default_channel) {
+        $schedule_days = min(14, max(1, absint($atts['schedule_days'])));
+
+        $output .= '<section class="cablecast-home__section cablecast-home__section--schedule">';
+        $output .= '<h2 class="cablecast-home__section-heading">' . esc_html($schedule_heading) . '</h2>';
+        $output .= do_shortcode('[cablecast_weekly_guide channel="' . $default_channel . '" days="' . $schedule_days . '" show_channel_switcher="true" show_category_colors="true"]');
+        $output .= '</section>';
+    }
+
+    // Section 3: Recent Shows
+    if ($show_recent) {
+        $recent_count = absint($atts['recent_count']) ?: 12;
+
+        $output .= '<section class="cablecast-home__section cablecast-home__section--recent">';
+        $output .= '<h2 class="cablecast-home__section-heading">' . esc_html($recent_heading) . '</h2>';
+        $output .= do_shortcode('[cablecast_shows count="' . $recent_count . '" layout="featured" columns="4" orderby="date" order="DESC"]');
+
+        // View all link
+        $shows_archive = get_post_type_archive_link('show');
+        if ($shows_archive) {
+            $output .= '<div class="cablecast-home__view-all">';
+            $output .= '<a href="' . esc_url($shows_archive) . '" class="cablecast-home__view-all-link">';
+            $output .= __('View All Shows', 'cablecast') . ' &rarr;';
+            $output .= '</a>';
+            $output .= '</div>';
+        }
+
+        $output .= '</section>';
+    }
+
+    // Section 4: Browse
+    if ($show_browse) {
+        $output .= '<section class="cablecast-home__section cablecast-home__section--browse">';
+        $output .= '<h2 class="cablecast-home__section-heading">' . esc_html($browse_heading) . '</h2>';
+
+        $output .= '<div class="cablecast-home__browse-grid">';
+
+        // Series
+        $output .= '<div class="cablecast-home__browse-section">';
+        $output .= '<h3 class="cablecast-home__browse-heading">' . esc_html__('Series', 'cablecast') . '</h3>';
+        $output .= do_shortcode('[cablecast_series count="6" layout="grid" show_thumbnails="true"]');
+
+        $series_archive = get_post_type_archive_link('show');
+        if ($series_archive) {
+            $output .= '<a href="' . esc_url(add_query_arg('browse', 'series', $series_archive)) . '" class="cablecast-home__browse-link">';
+            $output .= __('All Series', 'cablecast') . ' &rarr;';
+            $output .= '</a>';
+        }
+        $output .= '</div>';
+
+        // Categories
+        $output .= '<div class="cablecast-home__browse-section">';
+        $output .= '<h3 class="cablecast-home__browse-heading">' . esc_html__('Categories', 'cablecast') . '</h3>';
+        $output .= do_shortcode('[cablecast_categories layout="cloud" show_colors="true" show_counts="true"]');
+        $output .= '</div>';
+
+        // Producers
+        $output .= '<div class="cablecast-home__browse-section">';
+        $output .= '<h3 class="cablecast-home__browse-heading">' . esc_html__('Producers', 'cablecast') . '</h3>';
+        $output .= do_shortcode('[cablecast_producers count="10" orderby="count" layout="list"]');
+
+        $producers_link = get_term_link('cablecast_producer');
+        // Note: get_term_link with just taxonomy returns WP_Error, so we link to shows archive instead
+        $output .= '<a href="' . esc_url($shows_archive ?? '#') . '" class="cablecast-home__browse-link">';
+        $output .= __('All Producers', 'cablecast') . ' &rarr;';
+        $output .= '</a>';
+        $output .= '</div>';
+
+        $output .= '</div>'; // browse-grid
+        $output .= '</section>';
+    }
+
+    $output .= '</div>'; // cablecast-home
+
+    return $output;
 }
