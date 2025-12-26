@@ -279,7 +279,20 @@ function cablecast_sync_shows($shows_payload, $categories, $projects, $producers
       if ($vod != NULL) {
         cablecast_upsert_post_meta($id, "cablecast_vod_url", $vod->url);
         cablecast_upsert_post_meta($id, "cablecast_vod_embed", $vod->embedCode);
+
+        // Fetch and store chapters for this VOD
+        $server = $options["server"];
+        $chapters = cablecast_fetch_vod_chapters($server, $vod->id);
+        if (!empty($chapters)) {
+          cablecast_upsert_post_meta($id, "cablecast_vod_chapters", $chapters);
+        } else {
+          // Clear chapters if none exist (VOD may have had chapters removed)
+          delete_post_meta($id, "cablecast_vod_chapters");
+        }
       }
+    } else {
+      // No VOD - clear any existing chapter data
+      delete_post_meta($id, "cablecast_vod_chapters");
     }
 
     if (empty($show->producer) == FALSE) {
@@ -909,6 +922,52 @@ function cablecast_upsert_term_meta($id, $name, $value) {
  */
 function cablecast_log ($message) {
   \Cablecast\Logger::log('info', $message);
+}
+
+/**
+ * Fetch chapters for a VOD from the Cablecast API.
+ *
+ * @param string $server Server base URL
+ * @param int $vod_id VOD ID to fetch chapters for
+ * @return array Array of chapter data or empty array
+ */
+function cablecast_fetch_vod_chapters($server, $vod_id) {
+  $chapters_url = "$server" . CABLECAST_API_BASE . "/chapters?vod=$vod_id";
+
+  $response = wp_remote_get($chapters_url, array('timeout' => 15));
+
+  if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+    \Cablecast\Logger::log('debug', "Failed to fetch chapters for VOD $vod_id");
+    return [];
+  }
+
+  $body = json_decode(wp_remote_retrieve_body($response));
+
+  if (!$body || !isset($body->chapters)) {
+    return [];
+  }
+
+  // Filter out deleted and hidden chapters, normalize the data
+  $chapters = [];
+  foreach ($body->chapters as $chapter) {
+    if (!empty($chapter->deleted) || !empty($chapter->hidden)) {
+      continue;
+    }
+
+    $chapters[] = [
+      'id' => $chapter->id,
+      'title' => $chapter->title,
+      'body' => $chapter->body ?? '',
+      'offset' => (int) $chapter->offset,
+    ];
+  }
+
+  // Sort by offset ascending
+  usort($chapters, function($a, $b) {
+    return $a['offset'] - $b['offset'];
+  });
+
+  return $chapters;
 }
 
 /**

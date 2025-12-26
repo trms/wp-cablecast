@@ -132,6 +132,25 @@ function cablecast_get_shortcode_docs() {
                 ['title' => 'Basic Usage', 'atts' => ['id' => '{show_id}']],
             ],
         ],
+        'cablecast_chapters' => [
+            'name' => 'Chapters',
+            'tag' => 'cablecast_chapters',
+            'description' => 'Display interactive chapters for a show\'s VOD.',
+            'long_description' => 'Shows a clickable list of chapters for the show\'s VOD. Clicking a chapter seeks the embedded player to that timestamp using postMessage. The current chapter is automatically highlighted as the video plays. Requires a VOD embed on the same page.',
+            'attributes' => [
+                ['name' => 'id', 'required' => false, 'default' => 'Current post', 'options' => 'Show post ID', 'description' => 'WordPress post ID of the show (auto-detects in show context)'],
+                ['name' => 'player', 'required' => false, 'default' => 'Auto-detect', 'options' => 'CSS selector', 'description' => 'CSS selector for the player container (for pages with multiple players)'],
+                ['name' => 'show_descriptions', 'required' => false, 'default' => 'true', 'options' => 'true, false', 'description' => 'Show chapter descriptions'],
+                ['name' => 'show_timestamps', 'required' => false, 'default' => 'true', 'options' => 'true, false', 'description' => 'Show formatted timestamps'],
+                ['name' => 'layout', 'required' => false, 'default' => 'list', 'options' => 'list, compact', 'description' => 'Display layout style'],
+                ['name' => 'class', 'required' => false, 'default' => '', 'options' => 'CSS class name', 'description' => 'Additional CSS class for custom styling'],
+            ],
+            'examples' => [
+                ['title' => 'Basic Usage', 'atts' => ['id' => '{show_with_chapters_id}']],
+                ['title' => 'Compact (no descriptions)', 'atts' => ['id' => '{show_with_chapters_id}', 'layout' => 'compact']],
+                ['title' => 'Timestamps Only', 'atts' => ['id' => '{show_with_chapters_id}', 'show_descriptions' => 'false']],
+            ],
+        ],
         'cablecast_producers' => [
             'name' => 'Producers',
             'tag' => 'cablecast_producers',
@@ -200,6 +219,7 @@ function cablecast_get_example_ids() {
     $ids = [
         'channel_id' => null,
         'show_id' => null,
+        'show_with_chapters_id' => null,
         'producer_slug' => null,
         'series_slug' => null,
     ];
@@ -224,6 +244,28 @@ function cablecast_get_example_ids() {
     ]);
     if (!empty($shows)) {
         $ids['show_id'] = $shows[0]->ID;
+    }
+
+    // Get a show with VOD chapters
+    $shows_with_chapters = get_posts([
+        'post_type' => 'show',
+        'posts_per_page' => 1,
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'meta_query' => [
+            [
+                'key' => 'cablecast_vod_chapters',
+                'compare' => 'EXISTS',
+            ],
+            [
+                'key' => 'cablecast_vod_chapters',
+                'value' => '',
+                'compare' => '!=',
+            ],
+        ],
+    ]);
+    if (!empty($shows_with_chapters)) {
+        $ids['show_with_chapters_id'] = $shows_with_chapters[0]->ID;
     }
 
     // Get producer with most shows
@@ -269,6 +311,8 @@ function cablecast_generate_shortcode_string($tag, $atts, $example_ids = []) {
             $value = $example_ids['channel_id'];
         } elseif ($value === '{show_id}' && !empty($example_ids['show_id'])) {
             $value = $example_ids['show_id'];
+        } elseif ($value === '{show_with_chapters_id}' && !empty($example_ids['show_with_chapters_id'])) {
+            $value = $example_ids['show_with_chapters_id'];
         } elseif ($value === '{producer_slug}' && !empty($example_ids['producer_slug'])) {
             $value = $example_ids['producer_slug'];
         } elseif ($value === '{series_slug}' && !empty($example_ids['series_slug'])) {
@@ -405,6 +449,8 @@ function cablecast_render_shortcode_detail($shortcode, $example_ids) {
         $has_required_data = !empty($example_ids['channel_id']);
     } elseif (in_array($shortcode['tag'], ['cablecast_show', 'cablecast_vod_player'])) {
         $has_required_data = !empty($example_ids['show_id']);
+    } elseif ($shortcode['tag'] === 'cablecast_chapters') {
+        $has_required_data = !empty($example_ids['show_with_chapters_id']);
     }
     ?>
     <div class="cablecast-docs-detail">
@@ -436,12 +482,31 @@ function cablecast_render_shortcode_detail($shortcode, $example_ids) {
         <div class="cablecast-docs-preview">
             <?php
             if ($has_required_data && !empty($shortcode['examples'][0])) {
-                $preview_string = cablecast_generate_shortcode_string(
-                    $shortcode['tag'],
-                    $shortcode['examples'][0]['atts'],
-                    $example_ids
-                );
-                echo cablecast_render_live_example($preview_string);
+                // Special handling for chapters - show full setup with VOD player
+                if ($shortcode['tag'] === 'cablecast_chapters' && !empty($example_ids['show_with_chapters_id'])) {
+                    $show_id = $example_ids['show_with_chapters_id'];
+                    $preview_string = '[cablecast_vod_player id="' . $show_id . '"][cablecast_chapters id="' . $show_id . '"]';
+                    ?>
+                    <p class="description" style="margin-bottom: 15px;">
+                        <?php _e('Complete setup showing VOD player with interactive chapters:', 'cablecast'); ?>
+                    </p>
+                    <div class="cablecast-code-block-wrapper" style="margin-bottom: 15px;">
+                        <pre class="cablecast-code-block"><?php echo esc_html($preview_string); ?></pre>
+                        <button type="button" class="button button-small cablecast-copy-btn"
+                                data-shortcode="<?php echo esc_attr($preview_string); ?>">
+                            <?php _e('Copy', 'cablecast'); ?>
+                        </button>
+                    </div>
+                    <?php
+                    echo cablecast_render_live_example($preview_string);
+                } else {
+                    $preview_string = cablecast_generate_shortcode_string(
+                        $shortcode['tag'],
+                        $shortcode['examples'][0]['atts'],
+                        $example_ids
+                    );
+                    echo cablecast_render_live_example($preview_string);
+                }
             } else {
                 ?>
                 <p class="cablecast-docs-no-preview">

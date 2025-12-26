@@ -43,6 +43,7 @@ function cablecast_register_shortcodes() {
     add_shortcode('cablecast_shows', 'cablecast_shows_shortcode');
     add_shortcode('cablecast_show', 'cablecast_show_shortcode');
     add_shortcode('cablecast_vod_player', 'cablecast_vod_player_shortcode');
+    add_shortcode('cablecast_chapters', 'cablecast_chapters_shortcode');
     add_shortcode('cablecast_producers', 'cablecast_producers_shortcode');
     add_shortcode('cablecast_series', 'cablecast_series_shortcode');
     add_shortcode('cablecast_schedule_calendar', 'cablecast_schedule_calendar_shortcode');
@@ -86,8 +87,20 @@ function cablecast_enqueue_shortcode_assets() {
             true
         );
     }
+
+    // Enqueue JS if chapters shortcode was used
+    if (in_array('chapters', $cablecast_shortcodes_used)) {
+        wp_enqueue_script(
+            'cablecast-chapters',
+            plugins_url('../assets/js/chapters.js', __FILE__),
+            [],
+            filemtime(plugin_dir_path(__FILE__) . '../assets/js/chapters.js'),
+            true
+        );
+    }
 }
 add_action('wp_footer', 'cablecast_enqueue_shortcode_assets', 5);
+add_action('admin_footer', 'cablecast_enqueue_shortcode_assets', 5);
 
 /**
  * Mark a shortcode as used for conditional asset loading.
@@ -1094,6 +1107,137 @@ function cablecast_vod_player_shortcode($atts) {
     }
 
     return '<div class="' . implode(' ', $classes) . '">' . $vod_embed . '</div>';
+}
+
+// ============================================================================
+// CHAPTERS SHORTCODE
+// ============================================================================
+
+/**
+ * [cablecast_chapters] - Display interactive chapters for a show's VOD.
+ *
+ * @param array $atts Shortcode attributes
+ * @return string HTML output
+ */
+function cablecast_chapters_shortcode($atts) {
+    cablecast_mark_shortcode_used('chapters');
+
+    $atts = shortcode_atts([
+        'id' => '',                    // Show post ID (optional, defaults to current post)
+        'player' => '',                // Target player element selector (for multiple players)
+        'show_descriptions' => 'true', // Show chapter descriptions
+        'show_timestamps' => 'true',   // Show formatted timestamps
+        'layout' => 'list',            // list or compact
+        'class' => '',                 // Additional CSS class
+    ], $atts, 'cablecast_chapters');
+
+    // Determine show ID
+    $show_id = absint($atts['id']);
+    if (!$show_id) {
+        // Try to get from current post context
+        $show_id = cablecast_current_show_post_id();
+    }
+
+    if (!$show_id) {
+        return '<p class="cablecast-error">' . __('Please specify a show ID or use within a show context.', 'cablecast') . '</p>';
+    }
+
+    $show = get_post($show_id);
+    if (!$show || $show->post_type !== 'show') {
+        return '<p class="cablecast-error">' . __('Show not found.', 'cablecast') . '</p>';
+    }
+
+    // Check if show has VOD
+    $vod_embed = get_post_meta($show_id, 'cablecast_vod_embed', true);
+    if (!$vod_embed) {
+        return ''; // Silent fail - no VOD means no chapters to display
+    }
+
+    // Get chapters
+    $chapters = get_post_meta($show_id, 'cablecast_vod_chapters', true);
+    if (empty($chapters)) {
+        return ''; // Silent fail - no chapters available
+    }
+
+    // Ensure chapters is an array (handles both serialized and unserialized cases)
+    if (is_string($chapters)) {
+        $chapters = maybe_unserialize($chapters);
+    }
+
+    if (!is_array($chapters) || empty($chapters)) {
+        return '';
+    }
+
+    // Parse options
+    $show_descriptions = filter_var($atts['show_descriptions'], FILTER_VALIDATE_BOOLEAN);
+    $show_timestamps = filter_var($atts['show_timestamps'], FILTER_VALIDATE_BOOLEAN);
+    $layout = in_array($atts['layout'], ['list', 'compact']) ? $atts['layout'] : 'list';
+    $player_selector = sanitize_text_field($atts['player']);
+
+    // Build output
+    $classes = ['cablecast-chapters', 'cablecast-chapters--' . $layout];
+    if (!empty($atts['class'])) {
+        $classes[] = esc_attr($atts['class']);
+    }
+
+    // Data attributes for JS
+    $data_attrs = ' data-show-id="' . esc_attr($show_id) . '"';
+    if ($player_selector) {
+        $data_attrs .= ' data-player-selector="' . esc_attr($player_selector) . '"';
+    }
+
+    $output = '<div class="' . implode(' ', $classes) . '"' . $data_attrs . '>';
+
+    $output .= '<h3 class="cablecast-chapters__heading">' . __('Chapters', 'cablecast') . '</h3>';
+    $output .= '<ul class="cablecast-chapters__list">';
+
+    foreach ($chapters as $index => $chapter) {
+        $offset = (int) $chapter['offset'];
+        $timestamp = cablecast_format_chapter_timestamp($offset);
+
+        $item_class = 'cablecast-chapters__item';
+
+        $output .= '<li class="' . $item_class . '" data-offset="' . esc_attr($offset) . '">';
+
+        $output .= '<button type="button" class="cablecast-chapters__button">';
+
+        if ($show_timestamps) {
+            $output .= '<span class="cablecast-chapters__timestamp">' . esc_html($timestamp) . '</span>';
+        }
+
+        $output .= '<span class="cablecast-chapters__title">' . esc_html($chapter['title']) . '</span>';
+
+        $output .= '</button>';
+
+        if ($show_descriptions && !empty($chapter['body'])) {
+            $output .= '<p class="cablecast-chapters__description">' . esc_html($chapter['body']) . '</p>';
+        }
+
+        $output .= '</li>';
+    }
+
+    $output .= '</ul>';
+    $output .= '</div>';
+
+    return $output;
+}
+
+/**
+ * Format seconds to HH:MM:SS or MM:SS timestamp.
+ *
+ * @param int $seconds Total seconds
+ * @return string Formatted timestamp
+ */
+function cablecast_format_chapter_timestamp($seconds) {
+    $hours = floor($seconds / 3600);
+    $minutes = floor(($seconds % 3600) / 60);
+    $secs = $seconds % 60;
+
+    if ($hours > 0) {
+        return sprintf('%d:%02d:%02d', $hours, $minutes, $secs);
+    }
+
+    return sprintf('%d:%02d', $minutes, $secs);
 }
 
 // ============================================================================

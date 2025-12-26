@@ -166,6 +166,7 @@ class ShortcodesTest extends WP_UnitTestCase {
             'cablecast_shows',
             'cablecast_show',
             'cablecast_vod_player',
+            'cablecast_chapters',
             'cablecast_producers',
             'cablecast_series',
         ];
@@ -591,6 +592,216 @@ class ShortcodesTest extends WP_UnitTestCase {
 
         $this->assertStringContainsString('cablecast-vod-player', $output);
         $this->assertStringContainsString('iframe', $output);
+    }
+
+    // =========================================================================
+    // Chapters Shortcode Tests
+    // =========================================================================
+
+    /**
+     * Test [cablecast_chapters] returns empty for show without chapters.
+     */
+    public function test_chapters_no_chapters() {
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '"]');
+
+        // Should return empty when no chapters exist
+        $this->assertEmpty($output);
+    }
+
+    /**
+     * Test [cablecast_chapters] returns empty for show without VOD.
+     */
+    public function test_chapters_no_vod() {
+        // Create show without VOD
+        $show_no_vod = wp_insert_post([
+            'post_title' => 'Show Without VOD',
+            'post_type' => 'show',
+            'post_status' => 'publish',
+            'meta_input' => [
+                'cablecast_vod_chapters' => [
+                    ['id' => 1, 'title' => 'Chapter 1', 'body' => '', 'offset' => 0],
+                ],
+            ],
+        ]);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $show_no_vod . '"]');
+
+        // Should return empty when no VOD embed exists
+        $this->assertEmpty($output);
+
+        wp_delete_post($show_no_vod, true);
+    }
+
+    /**
+     * Test [cablecast_chapters] basic output with chapters.
+     */
+    public function test_chapters_basic_output() {
+        // Add chapters to the test show
+        $chapters = [
+            ['id' => 1, 'title' => 'Introduction', 'body' => 'Welcome to the show', 'offset' => 0],
+            ['id' => 2, 'title' => 'Main Content', 'body' => 'The main topic', 'offset' => 120],
+            ['id' => 3, 'title' => 'Conclusion', 'body' => 'Wrapping up', 'offset' => 300],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '"]');
+
+        $this->assertStringContainsString('cablecast-chapters', $output);
+        $this->assertStringContainsString('cablecast-chapters__list', $output);
+        $this->assertStringContainsString('Introduction', $output);
+        $this->assertStringContainsString('Main Content', $output);
+        $this->assertStringContainsString('Conclusion', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] includes data attributes for JS.
+     */
+    public function test_chapters_data_attributes() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => '', 'offset' => 0],
+            ['id' => 2, 'title' => 'Chapter 2', 'body' => '', 'offset' => 60],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '"]');
+
+        // Should have data-show-id attribute
+        $this->assertStringContainsString('data-show-id="' . $this->show_post_id . '"', $output);
+
+        // Should have data-offset attributes on items
+        $this->assertStringContainsString('data-offset="0"', $output);
+        $this->assertStringContainsString('data-offset="60"', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] shows timestamps by default.
+     */
+    public function test_chapters_shows_timestamps() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => '', 'offset' => 0],
+            ['id' => 2, 'title' => 'Chapter 2', 'body' => '', 'offset' => 125], // 2:05
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '"]');
+
+        $this->assertStringContainsString('cablecast-chapters__timestamp', $output);
+        $this->assertStringContainsString('0:00', $output);
+        $this->assertStringContainsString('2:05', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] hides timestamps when disabled.
+     */
+    public function test_chapters_hides_timestamps() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => '', 'offset' => 0],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '" show_timestamps="false"]');
+
+        $this->assertStringNotContainsString('cablecast-chapters__timestamp', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] shows descriptions by default.
+     */
+    public function test_chapters_shows_descriptions() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => 'This is the description', 'offset' => 0],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '"]');
+
+        $this->assertStringContainsString('cablecast-chapters__description', $output);
+        $this->assertStringContainsString('This is the description', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] hides descriptions when disabled.
+     */
+    public function test_chapters_hides_descriptions() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => 'This is the description', 'offset' => 0],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '" show_descriptions="false"]');
+
+        $this->assertStringNotContainsString('cablecast-chapters__description', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] compact layout.
+     */
+    public function test_chapters_compact_layout() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => '', 'offset' => 0],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '" layout="compact"]');
+
+        $this->assertStringContainsString('cablecast-chapters--compact', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] with custom class.
+     */
+    public function test_chapters_custom_class() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => '', 'offset' => 0],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '" class="my-custom-class"]');
+
+        $this->assertStringContainsString('my-custom-class', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] with player selector attribute.
+     */
+    public function test_chapters_player_selector() {
+        $chapters = [
+            ['id' => 1, 'title' => 'Chapter 1', 'body' => '', 'offset' => 0],
+        ];
+        update_post_meta($this->show_post_id, 'cablecast_vod_chapters', $chapters);
+
+        $output = do_shortcode('[cablecast_chapters id="' . $this->show_post_id . '" player="#my-player"]');
+
+        $this->assertStringContainsString('data-player-selector="#my-player"', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] requires valid show ID.
+     */
+    public function test_chapters_requires_valid_id() {
+        $output = do_shortcode('[cablecast_chapters id="99999"]');
+
+        $this->assertStringContainsString('Show not found', $output);
+    }
+
+    /**
+     * Test [cablecast_chapters] requires id when not in show context.
+     */
+    public function test_chapters_requires_id() {
+        $output = do_shortcode('[cablecast_chapters]');
+
+        $this->assertStringContainsString('specify a show ID', $output);
+    }
+
+    /**
+     * Test cablecast_format_chapter_timestamp() helper.
+     */
+    public function test_format_chapter_timestamp() {
+        $this->assertEquals('0:00', cablecast_format_chapter_timestamp(0));
+        $this->assertEquals('1:30', cablecast_format_chapter_timestamp(90));
+        $this->assertEquals('10:05', cablecast_format_chapter_timestamp(605));
+        $this->assertEquals('1:00:00', cablecast_format_chapter_timestamp(3600));
+        $this->assertEquals('1:30:45', cablecast_format_chapter_timestamp(5445));
     }
 
     // =========================================================================

@@ -126,6 +126,22 @@ function cablecast_settings_init()
         'cablecast',
         'cablecast_section_maintenance'
     );
+
+    // Danger Zone Section
+    add_settings_section(
+        'cablecast_section_danger',
+        __('Danger Zone', 'cablecast'),
+        'cablecast_section_danger_cb',
+        'cablecast'
+    );
+
+    add_settings_field(
+        'cablecast_field_clear_all_content',
+        __('Clear All Content', 'cablecast'),
+        'cablecast_field_clear_all_content_cb',
+        'cablecast',
+        'cablecast_section_danger'
+    );
 }
 
 /**
@@ -785,6 +801,205 @@ add_action('wp_ajax_cablecast_clear_schedule', function() {
     } else {
         wp_send_json_error(__('Failed to clear schedule', 'cablecast'));
     }
+});
+
+// Danger Zone section callback
+function cablecast_section_danger_cb($args)
+{
+    ?>
+    <div style="background: #fff6f6; border: 2px solid #d63638; border-radius: 4px; padding: 15px; margin-bottom: 10px;">
+        <p style="color: #d63638; margin: 0; font-weight: 600;">
+            <span class="dashicons dashicons-warning" style="color: #d63638;"></span>
+            <?php _e('Warning: Actions in this section are destructive and cannot be undone. Use with caution.', 'cablecast'); ?>
+        </p>
+    </div>
+    <?php
+}
+
+function cablecast_field_clear_all_content_cb($args)
+{
+    // Count content (safely handle missing properties)
+    $show_counts = wp_count_posts('show');
+    $show_count = ($show_counts->publish ?? 0) + ($show_counts->draft ?? 0) + ($show_counts->private ?? 0);
+
+    $channel_counts = wp_count_posts('channel');
+    $channel_count = ($channel_counts->publish ?? 0) + ($channel_counts->draft ?? 0);
+
+    $project_counts = wp_count_posts('project');
+    $project_count = ($project_counts->publish ?? 0) + ($project_counts->draft ?? 0);
+
+    $producer_counts = wp_count_posts('producer');
+    $producer_count = ($producer_counts->publish ?? 0) + ($producer_counts->draft ?? 0);
+
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'cablecast_schedule_items';
+    $schedule_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+
+    $total_count = $show_count + $channel_count + $project_count + $producer_count + $schedule_count;
+    ?>
+    <div style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 15px; max-width: 500px;">
+        <p style="margin-top: 0;">
+            <strong><?php _e('This will permanently delete:', 'cablecast'); ?></strong>
+        </p>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+            <li><?php printf(__('%d Shows (and their thumbnails)', 'cablecast'), $show_count); ?></li>
+            <li><?php printf(__('%d Channels', 'cablecast'), $channel_count); ?></li>
+            <li><?php printf(__('%d Projects', 'cablecast'), $project_count); ?></li>
+            <li><?php printf(__('%d Producers', 'cablecast'), $producer_count); ?></li>
+            <li><?php printf(__('%d Schedule Items', 'cablecast'), $schedule_count); ?></li>
+        </ul>
+        <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+            <?php _e('Sync state will also be reset. This is useful when switching to a different Cablecast server.', 'cablecast'); ?>
+        </p>
+
+        <?php if ($total_count > 0) : ?>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="button" id="cablecast-clear-all-content" style="background: #d63638; border-color: #d63638; color: #fff;">
+                <?php _e('Delete All Cablecast Content', 'cablecast'); ?>
+            </button>
+            <span id="cablecast-clear-all-result"></span>
+        </div>
+        <?php else : ?>
+        <p class="description"><?php _e('No Cablecast content to delete.', 'cablecast'); ?></p>
+        <?php endif; ?>
+    </div>
+
+    <script>
+    jQuery(function($) {
+        $('#cablecast-clear-all-content').on('click', function() {
+            var $btn = $(this);
+            var $result = $('#cablecast-clear-all-result');
+
+            // Double confirmation for safety
+            if (!confirm('<?php _e('WARNING: This will permanently delete ALL Cablecast content including shows, channels, projects, producers, and schedule data.\n\nAre you sure you want to continue?', 'cablecast'); ?>')) {
+                return;
+            }
+
+            var confirmText = prompt('<?php _e('Type DELETE to confirm:', 'cablecast'); ?>');
+            if (confirmText !== 'DELETE') {
+                $result.html('<span style="color: #666;"><?php _e('Cancelled', 'cablecast'); ?></span>');
+                return;
+            }
+
+            $btn.prop('disabled', true).text('<?php _e('Deleting...', 'cablecast'); ?>');
+            $result.html('<span style="color: #666;"><?php _e('This may take a while...', 'cablecast'); ?></span>');
+
+            $.ajax({
+                url: ajaxurl,
+                method: 'POST',
+                timeout: 300000, // 5 minute timeout for large datasets
+                data: {
+                    action: 'cablecast_clear_all_content',
+                    nonce: '<?php echo wp_create_nonce('cablecast_clear_all_content'); ?>'
+                },
+                success: function(response) {
+                    $btn.prop('disabled', false).text('<?php _e('Delete All Cablecast Content', 'cablecast'); ?>');
+                    if (response.success) {
+                        $result.html('<span style="color: #00a32a;">&#10004; ' + response.data + '</span>');
+                        setTimeout(function() { location.reload(); }, 2000);
+                    } else {
+                        $result.html('<span style="color: #d63638;">&#10006; ' + response.data + '</span>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false).text('<?php _e('Delete All Cablecast Content', 'cablecast'); ?>');
+                    $result.html('<span style="color: #d63638;">&#10006; <?php _e('Request failed or timed out', 'cablecast'); ?></span>');
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// AJAX handler for clear all content
+add_action('wp_ajax_cablecast_clear_all_content', function() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(__('Unauthorized', 'cablecast'));
+        return;
+    }
+
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'cablecast_clear_all_content')) {
+        wp_send_json_error(__('Invalid nonce', 'cablecast'));
+        return;
+    }
+
+    global $wpdb;
+    $deleted = ['shows' => 0, 'channels' => 0, 'projects' => 0, 'producers' => 0, 'schedule' => 0];
+
+    // Delete shows (with thumbnails)
+    $shows = get_posts([
+        'post_type' => 'show',
+        'posts_per_page' => -1,
+        'post_status' => 'any',
+        'fields' => 'ids',
+    ]);
+    foreach ($shows as $show_id) {
+        // Delete thumbnail attachment if exists
+        $thumbnail_id = get_post_thumbnail_id($show_id);
+        if ($thumbnail_id) {
+            wp_delete_attachment($thumbnail_id, true);
+        }
+        wp_delete_post($show_id, true);
+        $deleted['shows']++;
+    }
+
+    // Delete channels
+    $channels = get_posts([
+        'post_type' => 'channel',
+        'posts_per_page' => -1,
+        'post_status' => 'any',
+        'fields' => 'ids',
+    ]);
+    foreach ($channels as $channel_id) {
+        wp_delete_post($channel_id, true);
+        $deleted['channels']++;
+    }
+
+    // Delete projects
+    $projects = get_posts([
+        'post_type' => 'project',
+        'posts_per_page' => -1,
+        'post_status' => 'any',
+        'fields' => 'ids',
+    ]);
+    foreach ($projects as $project_id) {
+        wp_delete_post($project_id, true);
+        $deleted['projects']++;
+    }
+
+    // Delete producers
+    $producers = get_posts([
+        'post_type' => 'producer',
+        'posts_per_page' => -1,
+        'post_status' => 'any',
+        'fields' => 'ids',
+    ]);
+    foreach ($producers as $producer_id) {
+        wp_delete_post($producer_id, true);
+        $deleted['producers']++;
+    }
+
+    // Clear schedule table
+    $table_name = $wpdb->prefix . 'cablecast_schedule_items';
+    $deleted['schedule'] = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+    $wpdb->query("TRUNCATE TABLE $table_name");
+
+    // Reset sync state
+    update_option('cablecast_sync_since', date('Y-m-d\TH:i:s', strtotime('-1 year')));
+    update_option('cablecast_sync_index', 0);
+    update_option('cablecast_sync_total_result_count', 0);
+
+    $message = sprintf(
+        __('Deleted %d shows, %d channels, %d projects, %d producers, %d schedule items. Sync state reset.', 'cablecast'),
+        $deleted['shows'],
+        $deleted['channels'],
+        $deleted['projects'],
+        $deleted['producers'],
+        $deleted['schedule']
+    );
+
+    wp_send_json_success($message);
 });
 
 /**
