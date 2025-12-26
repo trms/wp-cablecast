@@ -9,8 +9,21 @@ class Logger {
     private static $dir;
     private static $file;
 
+    // Log levels in order of severity (higher = more severe)
+    const LEVEL_DEBUG   = 0;
+    const LEVEL_INFO    = 1;
+    const LEVEL_WARNING = 2;
+    const LEVEL_ERROR   = 3;
+
+    private static $level_map = [
+        'debug'   => self::LEVEL_DEBUG,
+        'info'    => self::LEVEL_INFO,
+        'warning' => self::LEVEL_WARNING,
+        'error'   => self::LEVEL_ERROR,
+    ];
+
     public static function init() {
-        // Choose uploads so it’s writable and not wiped by updates.
+        // Choose uploads so it's writable and not wiped by updates.
         $uploads = wp_upload_dir(null, false);
         self::$dir  = trailingslashit($uploads['basedir']) . 'cablecast/logs/';
         self::$file = self::$dir . 'cablecast.log';
@@ -34,7 +47,31 @@ class Logger {
         }
     }
 
+    /**
+     * Get the minimum log level based on WP_DEBUG setting.
+     * When WP_DEBUG is false, only warnings and errors are logged.
+     * When WP_DEBUG is true, all messages including debug and info are logged.
+     *
+     * @return int Minimum log level to record
+     */
+    public static function get_min_level() {
+        // Allow override via filter
+        $min_level = apply_filters('cablecast_log_level', null);
+        if ($min_level !== null && isset(self::$level_map[$min_level])) {
+            return self::$level_map[$min_level];
+        }
+
+        // Default: debug/info only when WP_DEBUG is on
+        return (defined('WP_DEBUG') && WP_DEBUG) ? self::LEVEL_DEBUG : self::LEVEL_WARNING;
+    }
+
     public static function log($level, $message, array $context = []) {
+        // Check if this level should be logged
+        $level_value = isset(self::$level_map[$level]) ? self::$level_map[$level] : self::LEVEL_INFO;
+        if ($level_value < self::get_min_level()) {
+            return; // Skip logging messages below minimum level
+        }
+
         self::ensure_dir();
 
         // Simple PSR-3-ish line format

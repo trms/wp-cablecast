@@ -54,6 +54,14 @@ function cablecast_settings_init()
         'cablecast',
         'cablecast_section_thumbnails'
     );
+
+    add_settings_field(
+        'cablecast_field_cdn_test',
+        __('CDN Connection Test', 'cablecast'),
+        'cablecast_field_cdn_test_cb',
+        'cablecast',
+        'cablecast_section_thumbnails'
+    );
 }
 
 /**
@@ -206,6 +214,146 @@ function cablecast_field_delete_local_thumbnails_cb($args)
     </p>
     <?php
 }
+
+function cablecast_field_cdn_test_cb($args)
+{
+    $options = get_option('cablecast_options');
+    $server = isset($options['server']) ? $options['server'] : '';
+    $current_mode = isset($options['thumbnail_mode']) ? $options['thumbnail_mode'] : 'local';
+
+    if (empty($server)) {
+        ?>
+        <p class="description">
+            <?php _e('Configure a server URL first to test CDN connectivity.', 'cablecast'); ?>
+        </p>
+        <?php
+        return;
+    }
+
+    if ($current_mode !== 'remote') {
+        ?>
+        <p class="description">
+            <?php _e('Switch to Remote Hosting to test CDN connectivity.', 'cablecast'); ?>
+        </p>
+        <?php
+        return;
+    }
+
+    ?>
+    <button type="button" class="button" id="cablecast-cdn-test">
+        <?php _e('Test CDN Connection', 'cablecast'); ?>
+    </button>
+    <span id="cablecast-cdn-test-result" style="margin-left: 10px;"></span>
+    <p class="description" style="margin-top: 8px;">
+        <?php _e('Verifies that thumbnail images can be loaded from the Cablecast CDN.', 'cablecast'); ?>
+    </p>
+    <script>
+    jQuery(function($) {
+        $('#cablecast-cdn-test').on('click', function() {
+            var $btn = $(this);
+            var $result = $('#cablecast-cdn-test-result');
+
+            $btn.prop('disabled', true).text('<?php _e('Testing...', 'cablecast'); ?>');
+            $result.text('').removeClass('notice-success notice-error');
+
+            $.ajax({
+                url: ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'cablecast_test_cdn',
+                    nonce: '<?php echo wp_create_nonce('cablecast_test_cdn'); ?>'
+                },
+                success: function(response) {
+                    $btn.prop('disabled', false).text('<?php _e('Test CDN Connection', 'cablecast'); ?>');
+                    if (response.success) {
+                        $result.html('<span style="color: #00a32a;">&#10004; ' + response.data + '</span>');
+                    } else {
+                        $result.html('<span style="color: #d63638;">&#10006; ' + response.data + '</span>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false).text('<?php _e('Test CDN Connection', 'cablecast'); ?>');
+                    $result.html('<span style="color: #d63638;">&#10006; <?php _e('Request failed', 'cablecast'); ?></span>');
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// AJAX handler for CDN test
+add_action('wp_ajax_cablecast_test_cdn', function() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(__('Unauthorized', 'cablecast'));
+        return;
+    }
+
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'cablecast_test_cdn')) {
+        wp_send_json_error(__('Invalid nonce', 'cablecast'));
+        return;
+    }
+
+    $options = get_option('cablecast_options');
+    $server = isset($options['server']) ? $options['server'] : '';
+
+    if (empty($server)) {
+        wp_send_json_error(__('No server configured', 'cablecast'));
+        return;
+    }
+
+    // Find a show with a thumbnail URL to test
+    $shows = get_posts([
+        'post_type' => 'show',
+        'posts_per_page' => 1,
+        'meta_query' => [
+            [
+                'key' => 'cablecast_thumbnail_url',
+                'compare' => 'EXISTS',
+            ],
+            [
+                'key' => 'cablecast_thumbnail_url',
+                'value' => '',
+                'compare' => '!=',
+            ],
+        ],
+    ]);
+
+    if (empty($shows)) {
+        // No shows with thumbnails, try testing a sample URL pattern
+        $test_url = rtrim($server, '/') . CABLECAST_API_BASE . '/shows';
+        $response = wp_remote_head($test_url, ['timeout' => 10]);
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(sprintf(__('Cannot reach server: %s', 'cablecast'), $response->get_error_message()));
+            return;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code >= 200 && $code < 400) {
+            wp_send_json_success(__('Server reachable. Sync shows to test thumbnail loading.', 'cablecast'));
+        } else {
+            wp_send_json_error(sprintf(__('Server returned status %d', 'cablecast'), $code));
+        }
+        return;
+    }
+
+    // Test loading the thumbnail URL
+    $thumbnail_url = get_post_meta($shows[0]->ID, 'cablecast_thumbnail_url', true);
+    $response = wp_remote_head($thumbnail_url, ['timeout' => 10]);
+
+    if (is_wp_error($response)) {
+        wp_send_json_error(sprintf(__('Thumbnail load failed: %s', 'cablecast'), $response->get_error_message()));
+        return;
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    if ($code >= 200 && $code < 400) {
+        wp_send_json_success(__('CDN thumbnail loading works correctly!', 'cablecast'));
+    } else {
+        wp_send_json_error(sprintf(__('Thumbnail returned status %d', 'cablecast'), $code));
+    }
+});
 
 /**
  * top level menu

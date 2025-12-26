@@ -10,6 +10,10 @@ require_once __DIR__ . '/includes/Logger.php';
 global $cablecast_db_version;
 $cablecast_db_version = '1.1';
 
+// Cablecast API configuration
+define('CABLECAST_API_VERSION', 'v1');
+define('CABLECAST_API_BASE', '/cablecastapi/' . CABLECAST_API_VERSION);
+
 function cablecast_deactivate() {
    $timestamp = wp_next_scheduled( 'cablecast_cron_hook' );
    wp_unschedule_event( $timestamp, 'cablecast_cron_hook' );

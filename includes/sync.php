@@ -18,7 +18,7 @@ function cablecast_sync_data() {
     $server = $options["server"];
     \Cablecast\Logger::log('info', "Syncing data for $server");
 
-    $field_response = wp_remote_get("$server/cablecastapi/v1/showfields", array('timeout' => 30));
+    $field_response = wp_remote_get("$server" . CABLECAST_API_BASE . "/showfields", array('timeout' => 30));
     if (!is_wp_error($field_response) && wp_remote_retrieve_response_code($field_response) === 200) {
       $field_definitions = json_decode(wp_remote_retrieve_body($field_response));
       if (isset($field_definitions->fieldDefinitions) && isset($field_definitions->showFields)) {
@@ -28,17 +28,17 @@ function cablecast_sync_data() {
       \Cablecast\Logger::log('error', 'Failed to fetch show field definitions from API');
     }
 
-    $channels = cablecast_get_resources("$server/cablecastapi/v1/channels", 'channels');
-    $live_streams = cablecast_get_resources("$server/cablecastapi/v1/livestreams", 'liveStreams');
-    $categories = cablecast_get_resources("$server/cablecastapi/v1/categories", 'categories');
-    $producers = cablecast_get_resources("$server/cablecastapi/v1/producers", 'producers');
-    $projects = cablecast_get_resources("$server/cablecastapi/v1/projects", 'projects');
-    $show_fields = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'showFields');
-    $field_definitions = cablecast_get_resources("$server/cablecastapi/v1/showfields", 'fieldDefinitions');
+    $channels = cablecast_get_resources("$server" . CABLECAST_API_BASE . "/channels", 'channels');
+    $live_streams = cablecast_get_resources("$server" . CABLECAST_API_BASE . "/livestreams", 'liveStreams');
+    $categories = cablecast_get_resources("$server" . CABLECAST_API_BASE . "/categories", 'categories');
+    $producers = cablecast_get_resources("$server" . CABLECAST_API_BASE . "/producers", 'producers');
+    $projects = cablecast_get_resources("$server" . CABLECAST_API_BASE . "/projects", 'projects');
+    $show_fields = cablecast_get_resources("$server" . CABLECAST_API_BASE . "/showfields", 'showFields');
+    $field_definitions = cablecast_get_resources("$server" . CABLECAST_API_BASE . "/showfields", 'fieldDefinitions');
 
     $today = date('Y-m-d', strtotime("now"));
     $two_weeks_from_now = date('Y-m-d', strtotime('+2 weeks'));
-    $schedule_sync_url = "$server/cablecastapi/v1/scheduleitems?start=$today&end=$two_weeks_from_now&include_cg_exempt=false&page_size=2000";
+    $schedule_sync_url = "$server" . CABLECAST_API_BASE . "/scheduleitems?start=$today&end=$two_weeks_from_now&include_cg_exempt=false&page_size=2000";
     $schedule_items = cablecast_get_resources($schedule_sync_url, 'scheduleItems');
 
     $shows_payload = cablecast_get_shows_payload();
@@ -76,7 +76,7 @@ function cablecast_get_shows_payload() {
   $json_search = "{\"savedShowSearch\":{\"query\":{\"groups\":[{\"orAnd\":\"and\",\"filters\":[{\"field\":\"lastModified\",\"operator\":\"greaterThan\",\"searchValue\":\"$since\"}]}],\"sortOptions\":[{\"field\":\"lastModified\",\"descending\":false},{\"field\":\"title\",\"descending\":false}]},\"name\":\"\"}}";
 
   // Use wp_remote_post instead of file_get_contents for proper timeout handling
-  $search_response = wp_remote_post("$server/cablecastapi/v1/shows/search/advanced", array(
+  $search_response = wp_remote_post("$server" . CABLECAST_API_BASE . "/shows/search/advanced", array(
     'timeout' => 30,
     'headers' => array('Content-Type' => 'application/json'),
     'body' => $json_search,
@@ -129,7 +129,7 @@ function cablecast_get_shows_payload() {
     $id_query .= "&ids[]=$id";
   }
 
-  $url = "$server/cablecastapi/v1/shows?page_size=$batch_size&include=reel,vod,webfile,thumbnail$id_query";
+  $url = "$server" . CABLECAST_API_BASE . "/shows?page_size=$batch_size&include=reel,vod,webfile,thumbnail$id_query";
   \Cablecast\Logger::log('info', "Retreving shows from using: $url");
 
   // Use wp_remote_get instead of file_get_contents for proper timeout handling
@@ -424,7 +424,7 @@ function cablecast_detect_orphan_posts() {
   update_option('cablecast_orphan_check_last_run', time());
 
   // Get all Cablecast show IDs from the API
-  $api_url = "$server/cablecastapi/v1/shows?page_size=10000&fields=id";
+  $api_url = "$server" . CABLECAST_API_BASE . "/shows?page_size=10000&fields=id";
   $response = wp_remote_get($api_url, array('timeout' => 60));
 
   if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
