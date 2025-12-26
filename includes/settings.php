@@ -129,6 +129,11 @@ function cablecast_field_thumbnail_mode_cb($args)
 
 function cablecast_field_delete_local_thumbnails_cb($args)
 {
+    // Verify user has capability before running expensive queries
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+
     $options = get_option('cablecast_options');
     $current_mode = isset($options['thumbnail_mode']) ? $options['thumbnail_mode'] : 'local';
     $delete_enabled = !empty($options['delete_local_thumbnails']);

@@ -1,5 +1,25 @@
 <?php
 
+/**
+ * CDN Thumbnail size mappings.
+ * Define once to avoid duplication across functions.
+ */
+define('CABLECAST_THUMBNAIL_SIZES', [
+    'thumbnail'      => '100x100',
+    'medium'         => '500x500',
+    'large'          => '1000x1000',
+    'post-thumbnail' => '640x360',
+    'full'           => '',  // no param = original size
+]);
+
+define('CABLECAST_SRCSET_VARIANTS', [
+    '320x180'  => 320,
+    '480x270'  => 480,
+    '640x360'  => 640,
+    '960x540'  => 960,
+    '1280x720' => 1280,
+]);
+
 function cablecast_setup_post_types() {
     // register the "book" custom post type
     register_post_type( 'show', [
@@ -202,20 +222,11 @@ function cablecast_show_thumbnail_url( $post_id, $size = 'post-thumbnail' ) {
         $base_thumbnail_url = "{$server}/cablecastapi/watch/show/{$show_id}/thumbnail";
     }
 
-    // Map common WP sizes to CDN dimension parameters
-    $map = [
-        'thumbnail'      => '100x100',
-        'medium'         => '500x500',
-        'large'          => '1000x1000',
-        'post-thumbnail' => '640x360',
-        'full'           => '',  // no param = original size
-    ];
-
-    // Support [width, height] arrays
+    // Support [width, height] arrays or use defined size mappings
     if ( is_array( $size ) && isset( $size[0], $size[1] ) ) {
         $dimensions = absint( $size[0] ) . 'x' . absint( $size[1] );
     } else {
-        $dimensions = $map[ $size ] ?? '';
+        $dimensions = CABLECAST_THUMBNAIL_SIZES[ $size ] ?? '';
     }
 
     $url = $base_thumbnail_url;
@@ -237,16 +248,8 @@ function cablecast_show_thumbnail_srcset( $post_id ) {
         return '';
     }
 
-    $variants = [
-        '320x180'  => 320,
-        '480x270'  => 480,
-        '640x360'  => 640,
-        '960x540'  => 960,
-        '1280x720' => 1280,
-    ];
-
     $parts = [];
-    foreach ( $variants as $wh => $w ) {
+    foreach ( CABLECAST_SRCSET_VARIANTS as $wh => $w ) {
         $parts[] = esc_url( $base_thumbnail_url . "?d={$wh}" ) . " {$w}w";
     }
 
