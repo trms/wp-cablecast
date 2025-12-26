@@ -801,6 +801,16 @@ function cablecast_options_page()
         'cablecast_options_page_html'
     );
 
+    // add shortcode documentation submenu
+    add_submenu_page(
+        'cablecast',
+        __('Shortcode Documentation', 'cablecast'),
+        __('Shortcode Docs', 'cablecast'),
+        'manage_options',
+        'cablecast-shortcode-docs',
+        'cablecast_shortcode_docs_page'
+    );
+
     add_management_page(
         'Cablecast Logs',
         'Cablecast Logs',

@@ -104,6 +104,7 @@ add_action('plugins_loaded', 'cablecast_maybe_upgrade');
 if ( is_admin() ) {
     // we are in admin mode
     require_once( dirname( __FILE__ ) . '/includes/settings.php' );
+    require_once( dirname( __FILE__ ) . '/includes/shortcode-docs.php' );
 }
 
 require_once( dirname( __FILE__ ) . '/includes/sync.php' );

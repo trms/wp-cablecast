@@ -1,0 +1,188 @@
+/**
+ * Cablecast FullCalendar Shortcode Styles
+ *
+ * Custom styling for the cablecast_schedule_calendar shortcode
+ * using FullCalendar.
+ */
+
+/* Container */
+.cablecast-fullcalendar {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    max-width: 100%;
+    margin: 20px 0;
+}
+
+/* Event styling */
+.cablecast-fullcalendar .fc-event {
+    cursor: pointer;
+    font-size: 0.85em;
+    border-radius: 3px;
+    padding: 2px 4px;
+}
+
+.cablecast-fullcalendar .fc-event:hover {
+    opacity: 0.85;
+}
+
+.cablecast-fullcalendar .fc-event-title {
+    font-weight: 500;
+}
+
+/* Time grid slots */
+.cablecast-fullcalendar .fc-timegrid-slot {
+    height: 2.5em;
+}
+
+.cablecast-fullcalendar .fc-timegrid-slot-label {
+    font-size: 0.8em;
+    color: #666;
+}
+
+/* Today highlight */
+.cablecast-fullcalendar .fc-day-today {
+    background-color: #fefce8 !important;
+}
+
+.cablecast-fullcalendar .fc-col-header-cell.fc-day-today {
+    background-color: #fef9c3;
+}
+
+/* Now indicator */
+.cablecast-fullcalendar .fc-timegrid-now-indicator-line {
+    border-color: #dc2626;
+    border-width: 2px;
+}
+
+.cablecast-fullcalendar .fc-timegrid-now-indicator-arrow {
+    border-color: #dc2626;
+    border-top-color: transparent;
+    border-bottom-color: transparent;
+}
+
+/* Toolbar */
+.cablecast-fullcalendar .fc-toolbar-title {
+    font-size: 1.25em;
+    font-weight: 600;
+}
+
+.cablecast-fullcalendar .fc-button {
+    text-transform: capitalize;
+    font-size: 0.9em;
+}
+
+.cablecast-fullcalendar .fc-button-primary {
+    background-color: #2271b1;
+    border-color: #2271b1;
+}
+
+.cablecast-fullcalendar .fc-button-primary:hover {
+    background-color: #135e96;
+    border-color: #135e96;
+}
+
+.cablecast-fullcalendar .fc-button-primary:not(:disabled).fc-button-active,
+.cablecast-fullcalendar .fc-button-primary:not(:disabled):active {
+    background-color: #135e96;
+    border-color: #135e96;
+}
+
+/* Day grid (month view) */
+.cablecast-fullcalendar .fc-daygrid-day-number {
+    padding: 4px 8px;
+    font-size: 0.9em;
+}
+
+.cablecast-fullcalendar .fc-daygrid-event {
+    margin-top: 2px;
+}
+
+.cablecast-fullcalendar .fc-daygrid-more-link {
+    color: #2271b1;
+    font-weight: 500;
+}
+
+/* List view */
+.cablecast-fullcalendar .fc-list-event:hover td {
+    background-color: #f5f5f5;
+}
+
+.cablecast-fullcalendar .fc-list-event-time {
+    white-space: nowrap;
+}
+
+.cablecast-fullcalendar .fc-list-day-cushion {
+    background-color: #f0f0f1;
+}
+
+.cablecast-fullcalendar .fc-list-event-dot {
+    border-radius: 50%;
+}
+
+/* Column headers */
+.cablecast-fullcalendar .fc-col-header-cell {
+    padding: 8px 0;
+    font-weight: 600;
+}
+
+.cablecast-fullcalendar .fc-col-header-cell-cushion {
+    color: #1d2327;
+}
+
+/* Scrollbar styling for time grid */
+.cablecast-fullcalendar .fc-scroller {
+    scrollbar-width: thin;
+    scrollbar-color: #c3c4c7 transparent;
+}
+
+.cablecast-fullcalendar .fc-scroller::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.cablecast-fullcalendar .fc-scroller::-webkit-scrollbar-thumb {
+    background-color: #c3c4c7;
+    border-radius: 4px;
+}
+
+.cablecast-fullcalendar .fc-scroller::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .cablecast-fullcalendar .fc-toolbar {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .cablecast-fullcalendar .fc-toolbar-chunk {
+        display: flex;
+        justify-content: center;
+    }
+
+    .cablecast-fullcalendar .fc-toolbar-title {
+        font-size: 1.1em;
+    }
+
+    .cablecast-fullcalendar .fc-button {
+        font-size: 0.8em;
+        padding: 4px 8px;
+    }
+
+    /* Hide some view buttons on mobile */
+    .cablecast-fullcalendar .fc-dayGridMonth-button,
+    .cablecast-fullcalendar .fc-timeGridWeek-button {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .cablecast-fullcalendar .fc-toolbar-chunk:last-child {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .cablecast-fullcalendar .fc-timegrid-slot {
+        height: 2em;
+    }
+}

@@ -45,8 +45,13 @@ function cablecast_register_shortcodes() {
     add_shortcode('cablecast_vod_player', 'cablecast_vod_player_shortcode');
     add_shortcode('cablecast_producers', 'cablecast_producers_shortcode');
     add_shortcode('cablecast_series', 'cablecast_series_shortcode');
+    add_shortcode('cablecast_schedule_calendar', 'cablecast_schedule_calendar_shortcode');
 }
 add_action('init', 'cablecast_register_shortcodes');
+
+// Register AJAX handlers for FullCalendar
+add_action('wp_ajax_cablecast_calendar_events', 'cablecast_calendar_events_ajax');
+add_action('wp_ajax_nopriv_cablecast_calendar_events', 'cablecast_calendar_events_ajax');
 
 /**
  * Enqueue shortcode assets conditionally.
@@ -1247,4 +1252,154 @@ function cablecast_series_shortcode($atts) {
     $output .= '</div>';
 
     return $output;
+}
+
+// ============================================================================
+// SCHEDULE CALENDAR SHORTCODE (FullCalendar)
+// ============================================================================
+
+/**
+ * AJAX handler for FullCalendar events.
+ */
+function cablecast_calendar_events_ajax() {
+    check_ajax_referer('cablecast_calendar_nonce', 'nonce');
+
+    $channel_id = intval($_GET['channel_id']);
+    $start = sanitize_text_field($_GET['start']);
+    $end = sanitize_text_field($_GET['end']);
+
+    // Get schedule items from database
+    $items = cablecast_get_schedules($channel_id, $start, $end);
+
+    // Get category colors
+    $options = get_option('cablecast_options');
+    $category_colors = isset($options['category_colors']) ? $options['category_colors'] : [];
+
+    // Convert to FullCalendar event format
+    $events = [];
+    foreach ($items as $item) {
+        $show = cablecast_get_show_from_schedule($item);
+        $show_url = $show ? get_permalink($show) : '';
+
+        // Get show category for color
+        $color = '#3788d8'; // Default blue
+        if ($show) {
+            $categories = get_the_terms($show->ID, 'category');
+            if ($categories && !is_wp_error($categories)) {
+                foreach ($categories as $cat) {
+                    if (isset($category_colors[$cat->slug])) {
+                        $color = $category_colors[$cat->slug];
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Calculate end time (default 30 min if no runtime)
+        $start_time = strtotime($item->run_date_time);
+        $runtime = $show ? (int) get_post_meta($show->ID, 'cablecast_show_trt', true) : 0;
+        $end_time = $start_time + ($runtime > 0 ? $runtime : 1800);
+
+        $events[] = [
+            'id' => $item->schedule_item_id,
+            'title' => $item->show_title,
+            'start' => date('c', $start_time),
+            'end' => date('c', $end_time),
+            'url' => $show_url,
+            'backgroundColor' => $color,
+            'borderColor' => $color,
+        ];
+    }
+
+    wp_send_json($events);
+}
+
+/**
+ * [cablecast_schedule_calendar] - Display schedule using FullCalendar.
+ *
+ * @param array $atts Shortcode attributes
+ * @return string HTML output
+ */
+function cablecast_schedule_calendar_shortcode($atts) {
+    cablecast_mark_shortcode_used('schedule_calendar');
+
+    $atts = shortcode_atts([
+        'channel' => '',
+        'view' => 'timeGridWeek',
+        'height' => 'auto',
+        'header' => 'true',
+        'nav' => 'true',
+        'show_category_colors' => 'true',
+        'class' => '',
+    ], $atts, 'cablecast_schedule_calendar');
+
+    // Validate channel
+    $channel_id = absint($atts['channel']);
+    if (!$channel_id) {
+        return '<p class="cablecast-error">' . __('Please specify a channel ID.', 'cablecast') . '</p>';
+    }
+
+    // Get Cablecast channel ID from post meta
+    $cablecast_channel_id = get_post_meta($channel_id, 'cablecast_channel_id', true);
+    if (!$cablecast_channel_id) {
+        return '<p class="cablecast-error">' . __('Invalid channel.', 'cablecast') . '</p>';
+    }
+
+    // Enqueue FullCalendar from CDN
+    wp_enqueue_script(
+        'fullcalendar',
+        'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js',
+        [],
+        '6.1.11',
+        true
+    );
+
+    wp_enqueue_script(
+        'cablecast-fullcalendar',
+        plugins_url('../assets/js/fullcalendar-shortcode.js', __FILE__),
+        ['fullcalendar'],
+        filemtime(plugin_dir_path(__FILE__) . '../assets/js/fullcalendar-shortcode.js'),
+        true
+    );
+
+    wp_enqueue_style(
+        'cablecast-fullcalendar',
+        plugins_url('../assets/css/fullcalendar-shortcode.css', __FILE__),
+        [],
+        filemtime(plugin_dir_path(__FILE__) . '../assets/css/fullcalendar-shortcode.css')
+    );
+
+    // Generate unique ID for this calendar instance
+    $calendar_id = 'cablecast-calendar-' . uniqid();
+
+    // Parse boolean options
+    $show_header = filter_var($atts['header'], FILTER_VALIDATE_BOOLEAN);
+    $show_nav = filter_var($atts['nav'], FILTER_VALIDATE_BOOLEAN);
+
+    // Build config for JS
+    $config = [
+        'calendarId' => $calendar_id,
+        'channelId' => $cablecast_channel_id,
+        'initialView' => $atts['view'],
+        'height' => $atts['height'],
+        'showHeader' => $show_header,
+        'showNav' => $show_nav,
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('cablecast_calendar_nonce'),
+    ];
+
+    // Inline the config
+    wp_add_inline_script(
+        'cablecast-fullcalendar',
+        'window.cablecastCalendars = window.cablecastCalendars || []; window.cablecastCalendars.push(' . wp_json_encode($config) . ');',
+        'before'
+    );
+
+    // Build output
+    $classes = ['cablecast-fullcalendar'];
+    if (!empty($atts['class'])) {
+        $classes[] = esc_attr($atts['class']);
+    }
+
+    return '<div id="' . esc_attr($calendar_id) . '" class="' . implode(' ', $classes) . '"></div>';
 }
