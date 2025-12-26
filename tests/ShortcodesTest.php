@@ -439,10 +439,22 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test [cablecast_weekly_guide] channel switcher.
      */
     public function test_weekly_guide_channel_switcher() {
+        // Channel switcher only shows when there are multiple channels
+        $second_channel = wp_insert_post([
+            'post_title' => 'Second Channel',
+            'post_type' => 'cablecast_channel',
+            'post_status' => 'publish',
+            'meta_input' => [
+                'cablecast_channel_id' => 2,
+            ],
+        ]);
+
         $output = do_shortcode('[cablecast_weekly_guide show_channel_switcher="true"]');
 
         $this->assertStringContainsString('cablecast-weekly-guide__channel-switcher', $output);
         $this->assertStringContainsString('cablecast-channel-select', $output);
+
+        wp_delete_post($second_channel, true);
     }
 
     /**
