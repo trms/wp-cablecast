@@ -62,6 +62,38 @@ function cablecast_settings_init()
         'cablecast',
         'cablecast_section_thumbnails'
     );
+
+    // Maintenance Section
+    add_settings_section(
+        'cablecast_section_maintenance',
+        __('Maintenance', 'cablecast'),
+        'cablecast_section_maintenance_cb',
+        'cablecast'
+    );
+
+    add_settings_field(
+        'cablecast_field_sync_status',
+        __('Sync Status', 'cablecast'),
+        'cablecast_field_sync_status_cb',
+        'cablecast',
+        'cablecast_section_maintenance'
+    );
+
+    add_settings_field(
+        'cablecast_field_reset_sync',
+        __('Reset Sync', 'cablecast'),
+        'cablecast_field_reset_sync_cb',
+        'cablecast',
+        'cablecast_section_maintenance'
+    );
+
+    add_settings_field(
+        'cablecast_field_clear_schedule',
+        __('Clear Schedule', 'cablecast'),
+        'cablecast_field_clear_schedule_cb',
+        'cablecast',
+        'cablecast_section_maintenance'
+    );
 }
 
 /**
@@ -357,6 +389,215 @@ add_action('wp_ajax_cablecast_test_cdn', function() {
     }
 });
 
+// Maintenance section callbacks
+function cablecast_section_maintenance_cb($args)
+{
+    ?>
+    <p><?php _e('Tools for troubleshooting and managing sync state.', 'cablecast'); ?></p>
+    <?php
+}
+
+function cablecast_field_sync_status_cb($args)
+{
+    $total = get_option('cablecast_sync_total_result_count', 0);
+    $sync_index = get_option('cablecast_sync_index', 0);
+    $since = get_option('cablecast_sync_since');
+    $remaining = max(0, $total - $sync_index);
+
+    $since_display = $since ? date('F j, Y', strtotime($since)) : __('beginning of time', 'cablecast');
+    ?>
+    <div class="notice notice-info inline" style="margin: 0; padding: 10px;">
+        <p>
+            <strong><?php _e('Syncing shows modified after:', 'cablecast'); ?></strong> <?php echo esc_html($since_display); ?><br>
+            <strong><?php _e('Progress:', 'cablecast'); ?></strong>
+            <?php if ($total > 0): ?>
+                <?php printf(__('%d of %d shows processed (%d remaining)', 'cablecast'), $sync_index, $total, $remaining); ?>
+            <?php else: ?>
+                <?php _e('No sync in progress', 'cablecast'); ?>
+            <?php endif; ?>
+        </p>
+    </div>
+    <?php
+}
+
+function cablecast_field_reset_sync_cb($args)
+{
+    // Default to 1 year ago
+    $default_date = date('Y-m-d', strtotime('-1 year'));
+    $current_since = get_option('cablecast_sync_since');
+    $current_date = $current_since ? date('Y-m-d', strtotime($current_since)) : $default_date;
+    ?>
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <label for="cablecast-reset-sync-date">
+            <?php _e('Sync shows modified after:', 'cablecast'); ?>
+        </label>
+        <input type="date" id="cablecast-reset-sync-date" value="<?php echo esc_attr($current_date); ?>" style="width: auto;">
+        <button type="button" class="button" id="cablecast-reset-sync">
+            <?php _e('Reset Sync', 'cablecast'); ?>
+        </button>
+        <span id="cablecast-reset-sync-result" style="margin-left: 5px;"></span>
+    </div>
+    <p class="description" style="margin-top: 8px;">
+        <?php _e('Clears current sync progress and starts fresh from the selected date. Use an older date to sync more historical content, or a recent date to limit to new shows only.', 'cablecast'); ?>
+    </p>
+    <script>
+    jQuery(function($) {
+        $('#cablecast-reset-sync').on('click', function() {
+            var $btn = $(this);
+            var $result = $('#cablecast-reset-sync-result');
+            var syncDate = $('#cablecast-reset-sync-date').val();
+
+            if (!syncDate) {
+                $result.html('<span style="color: #d63638;"><?php _e('Please select a date', 'cablecast'); ?></span>');
+                return;
+            }
+
+            if (!confirm('<?php _e('Are you sure you want to reset the sync? This will clear current progress and start fresh from the selected date.', 'cablecast'); ?>')) {
+                return;
+            }
+
+            $btn.prop('disabled', true).text('<?php _e('Resetting...', 'cablecast'); ?>');
+            $result.text('');
+
+            $.ajax({
+                url: ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'cablecast_reset_sync',
+                    nonce: '<?php echo wp_create_nonce('cablecast_reset_sync'); ?>',
+                    sync_date: syncDate
+                },
+                success: function(response) {
+                    $btn.prop('disabled', false).text('<?php _e('Reset Sync', 'cablecast'); ?>');
+                    if (response.success) {
+                        $result.html('<span style="color: #00a32a;">&#10004; ' + response.data + '</span>');
+                        // Reload page after short delay to show updated status
+                        setTimeout(function() { location.reload(); }, 1500);
+                    } else {
+                        $result.html('<span style="color: #d63638;">&#10006; ' + response.data + '</span>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false).text('<?php _e('Reset Sync', 'cablecast'); ?>');
+                    $result.html('<span style="color: #d63638;">&#10006; <?php _e('Request failed', 'cablecast'); ?></span>');
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// AJAX handler for reset sync
+add_action('wp_ajax_cablecast_reset_sync', function() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(__('Unauthorized', 'cablecast'));
+        return;
+    }
+
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'cablecast_reset_sync')) {
+        wp_send_json_error(__('Invalid nonce', 'cablecast'));
+        return;
+    }
+
+    $sync_date = sanitize_text_field($_POST['sync_date'] ?? '');
+    if (empty($sync_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $sync_date)) {
+        wp_send_json_error(__('Invalid date format', 'cablecast'));
+        return;
+    }
+
+    // Convert date to the format used by sync (ISO 8601 with time)
+    $sync_since = date('Y-m-d\TH:i:s', strtotime($sync_date));
+
+    update_option('cablecast_sync_since', $sync_since);
+    update_option('cablecast_sync_index', 0);
+    update_option('cablecast_sync_total_result_count', 0);
+
+    $formatted_date = date('F j, Y', strtotime($sync_date));
+    wp_send_json_success(sprintf(__('Sync reset. Next cron run will sync shows modified after %s.', 'cablecast'), $formatted_date));
+});
+
+function cablecast_field_clear_schedule_cb($args)
+{
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'cablecast_schedule_items';
+    $count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+    ?>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <button type="button" class="button" id="cablecast-clear-schedule">
+            <?php _e('Clear Schedule', 'cablecast'); ?>
+        </button>
+        <span id="cablecast-clear-schedule-result"></span>
+    </div>
+    <p class="description" style="margin-top: 8px;">
+        <?php printf(__('Removes all %d schedule items from the database. Schedule will be rebuilt on next sync.', 'cablecast'), intval($count)); ?>
+    </p>
+    <script>
+    jQuery(function($) {
+        $('#cablecast-clear-schedule').on('click', function() {
+            var $btn = $(this);
+            var $result = $('#cablecast-clear-schedule-result');
+
+            if (!confirm('<?php _e('Are you sure you want to clear all schedule data? This cannot be undone.', 'cablecast'); ?>')) {
+                return;
+            }
+
+            $btn.prop('disabled', true).text('<?php _e('Clearing...', 'cablecast'); ?>');
+            $result.text('');
+
+            $.ajax({
+                url: ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'cablecast_clear_schedule',
+                    nonce: '<?php echo wp_create_nonce('cablecast_clear_schedule'); ?>'
+                },
+                success: function(response) {
+                    $btn.prop('disabled', false).text('<?php _e('Clear Schedule', 'cablecast'); ?>');
+                    if (response.success) {
+                        $result.html('<span style="color: #00a32a;">&#10004; ' + response.data + '</span>');
+                        // Reload page after short delay to show updated count
+                        setTimeout(function() { location.reload(); }, 1500);
+                    } else {
+                        $result.html('<span style="color: #d63638;">&#10006; ' + response.data + '</span>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false).text('<?php _e('Clear Schedule', 'cablecast'); ?>');
+                    $result.html('<span style="color: #d63638;">&#10006; <?php _e('Request failed', 'cablecast'); ?></span>');
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// AJAX handler for clear schedule
+add_action('wp_ajax_cablecast_clear_schedule', function() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(__('Unauthorized', 'cablecast'));
+        return;
+    }
+
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'cablecast_clear_schedule')) {
+        wp_send_json_error(__('Invalid nonce', 'cablecast'));
+        return;
+    }
+
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'cablecast_schedule_items';
+
+    // Use TRUNCATE for efficiency (resets auto-increment too)
+    $result = $wpdb->query("TRUNCATE TABLE $table_name");
+
+    if ($result !== false) {
+        wp_send_json_success(__('Schedule cleared. Next sync will rebuild schedule data.', 'cablecast'));
+    } else {
+        wp_send_json_error(__('Failed to clear schedule', 'cablecast'));
+    }
+});
+
 /**
  * top level menu
  */
@@ -446,23 +687,8 @@ function cablecast_options_page_html()
     }
 
     ?>
-    <?php
-      $total = get_option('cablecast_sync_total_result_count');
-      $sync_index = get_option('cablecast_sync_index');
-      if ($total == FALSE) {
-        $total = 0;
-      }
-      if ($sync_index == FALSE) {
-        $sync_index = 0;
-      }
-      $remaining = $total - $sync_index;
-     ?>
-
     <div class="wrap">
         <h1><?= esc_html(get_admin_page_title()); ?></h1>
-        <div class="notice notice-info">
-          <p>There are <?= $remaining ?> remaining shows out of  <?= $total ?> shows updated after <?= esc_html(get_option('cablecast_sync_since')); ?></p>
-        </div>
         <form action="options.php" method="post">
             <?php
             // output security fields for the registered setting "cablecast"
