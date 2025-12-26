@@ -20,6 +20,7 @@
             <directory suffix=".php">./includes/</directory>
             <file>./cablecast.php</file>
             <file>./display.php</file>
+            <file>./theme-functions.php</file>
         </include>
     </coverage>
 </phpunit>

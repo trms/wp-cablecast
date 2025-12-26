@@ -63,6 +63,38 @@ function cablecast_settings_init()
         'cablecast_section_thumbnails'
     );
 
+    // Shortcode Settings Section
+    add_settings_section(
+        'cablecast_section_shortcodes',
+        __('Shortcode Settings', 'cablecast'),
+        'cablecast_section_shortcodes_cb',
+        'cablecast'
+    );
+
+    add_settings_field(
+        'cablecast_field_shortcode_styles',
+        __('Default Styling', 'cablecast'),
+        'cablecast_field_shortcode_styles_cb',
+        'cablecast',
+        'cablecast_section_shortcodes'
+    );
+
+    add_settings_field(
+        'cablecast_field_filler_keywords',
+        __('Filler Keywords', 'cablecast'),
+        'cablecast_field_filler_keywords_cb',
+        'cablecast',
+        'cablecast_section_shortcodes'
+    );
+
+    add_settings_field(
+        'cablecast_field_category_colors',
+        __('Category Colors', 'cablecast'),
+        'cablecast_field_category_colors_cb',
+        'cablecast',
+        'cablecast_section_shortcodes'
+    );
+
     // Maintenance Section
     add_settings_section(
         'cablecast_section_maintenance',
@@ -388,6 +420,163 @@ add_action('wp_ajax_cablecast_test_cdn', function() {
         wp_send_json_error(sprintf(__('Thumbnail returned status %d', 'cablecast'), $code));
     }
 });
+
+// Shortcode settings callbacks
+function cablecast_section_shortcodes_cb($args)
+{
+    ?>
+    <p><?php _e('Configure settings for Cablecast shortcodes.', 'cablecast'); ?></p>
+    <?php
+}
+
+function cablecast_field_shortcode_styles_cb($args)
+{
+    $options = get_option('cablecast_options');
+    $styles_enabled = !isset($options['shortcode_styles']) || $options['shortcode_styles'];
+    ?>
+    <fieldset>
+        <label>
+            <input type="checkbox" name="cablecast_options[shortcode_styles]" value="1" <?php checked($styles_enabled); ?>>
+            <?php _e('Enable default shortcode styling', 'cablecast'); ?>
+        </label>
+        <p class="description" style="margin-top: 4px;">
+            <?php _e('When enabled, shortcodes include professional default CSS. Disable for full theme control over styling.', 'cablecast'); ?>
+        </p>
+    </fieldset>
+    <?php
+}
+
+function cablecast_field_filler_keywords_cb($args)
+{
+    $options = get_option('cablecast_options');
+    $filler_keywords = isset($options['filler_keywords']) ? $options['filler_keywords'] : '';
+    $default_keywords = implode(', ', CABLECAST_DEFAULT_FILLER_KEYWORDS);
+    ?>
+    <textarea name="cablecast_options[filler_keywords]" rows="3" cols="50" class="large-text code"><?php echo esc_textarea($filler_keywords); ?></textarea>
+    <p class="description">
+        <?php _e('Comma-separated list of keywords to identify filler content (e.g., color bars, test patterns). Programs matching these keywords can be hidden in schedule shortcodes.', 'cablecast'); ?>
+    </p>
+    <p class="description">
+        <strong><?php _e('Default keywords:', 'cablecast'); ?></strong> <?php echo esc_html($default_keywords); ?>
+    </p>
+    <?php
+}
+
+function cablecast_field_category_colors_cb($args)
+{
+    $options = get_option('cablecast_options');
+    $colors_enabled = !empty($options['enable_category_colors']);
+    $category_colors = isset($options['category_colors']) ? $options['category_colors'] : [];
+
+    // Get all categories used by shows
+    $categories = get_terms([
+        'taxonomy' => 'category',
+        'hide_empty' => true,
+        'object_ids' => get_posts([
+            'post_type' => 'show',
+            'posts_per_page' => -1,
+            'fields' => 'ids',
+        ]),
+    ]);
+    ?>
+    <fieldset>
+        <label>
+            <input type="checkbox" name="cablecast_options[enable_category_colors]" value="1" <?php checked($colors_enabled); ?> id="cablecast-enable-category-colors">
+            <?php _e('Enable category color coding in schedules', 'cablecast'); ?>
+        </label>
+        <p class="description" style="margin-top: 4px;">
+            <?php _e('When enabled, schedule items will be color-coded based on their category.', 'cablecast'); ?>
+        </p>
+    </fieldset>
+
+    <?php if (!empty($categories) && !is_wp_error($categories)) : ?>
+    <div id="cablecast-category-colors-table" style="margin-top: 15px; <?php echo $colors_enabled ? '' : 'display: none;'; ?>">
+        <table class="widefat fixed" style="max-width: 500px;">
+            <thead>
+                <tr>
+                    <th><?php _e('Category', 'cablecast'); ?></th>
+                    <th style="width: 150px;"><?php _e('Color', 'cablecast'); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($categories as $category) :
+                    $current_color = isset($category_colors[$category->slug]) ? $category_colors[$category->slug] : '';
+                ?>
+                <tr>
+                    <td>
+                        <?php echo esc_html($category->name); ?>
+                        <span class="description">(<?php echo esc_html($category->count); ?> <?php _e('shows', 'cablecast'); ?>)</span>
+                    </td>
+                    <td>
+                        <input type="color"
+                               name="cablecast_options[category_colors][<?php echo esc_attr($category->slug); ?>]"
+                               value="<?php echo esc_attr($current_color ?: '#cccccc'); ?>"
+                               style="width: 50px; height: 30px; padding: 0; border: 1px solid #ddd; cursor: pointer;">
+                        <button type="button" class="button button-small cablecast-clear-color" data-slug="<?php echo esc_attr($category->slug); ?>" style="margin-left: 5px;">
+                            <?php _e('Clear', 'cablecast'); ?>
+                        </button>
+                        <input type="hidden" class="cablecast-color-cleared" name="cablecast_options[category_colors_cleared][<?php echo esc_attr($category->slug); ?>]" value="<?php echo $current_color ? '0' : '1'; ?>">
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <p class="description" style="margin-top: 8px;">
+            <?php _e('Click "Clear" to remove a category color. Only categories with assigned colors will be highlighted.', 'cablecast'); ?>
+        </p>
+    </div>
+    <?php else : ?>
+    <p class="description" style="margin-top: 10px;">
+        <?php _e('No categories found. Sync shows with categories to configure colors.', 'cablecast'); ?>
+    </p>
+    <?php endif; ?>
+
+    <script>
+    jQuery(function($) {
+        // Toggle category colors table visibility
+        $('#cablecast-enable-category-colors').on('change', function() {
+            $('#cablecast-category-colors-table').toggle(this.checked);
+        });
+
+        // Clear color button
+        $('.cablecast-clear-color').on('click', function() {
+            var $btn = $(this);
+            var $input = $btn.prev('input[type="color"]');
+            var $cleared = $btn.next('.cablecast-color-cleared');
+            $input.val('#cccccc');
+            $cleared.val('1');
+        });
+
+        // Mark as not cleared when color is changed
+        $('input[type="color"]').on('change', function() {
+            $(this).siblings('.cablecast-clear-color').next('.cablecast-color-cleared').val('0');
+        });
+    });
+    </script>
+    <?php
+}
+
+// Filter to clean up category colors on save
+add_filter('pre_update_option_cablecast_options', function($value, $old_value) {
+    // Remove cleared colors
+    if (isset($value['category_colors']) && isset($value['category_colors_cleared'])) {
+        foreach ($value['category_colors_cleared'] as $slug => $cleared) {
+            if ($cleared === '1' && isset($value['category_colors'][$slug])) {
+                unset($value['category_colors'][$slug]);
+            }
+        }
+        unset($value['category_colors_cleared']);
+    }
+
+    // Remove default/gray colors (user never set them)
+    if (isset($value['category_colors'])) {
+        $value['category_colors'] = array_filter($value['category_colors'], function($color) {
+            return $color && $color !== '#cccccc';
+        });
+    }
+
+    return $value;
+}, 10, 2);
 
 // Maintenance section callbacks
 function cablecast_section_maintenance_cb($args)
