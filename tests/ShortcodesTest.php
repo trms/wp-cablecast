@@ -15,6 +15,9 @@ class ShortcodesTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
 
+        // Set timezone for tests (prevents DateTimeZone exception)
+        update_option('timezone_string', 'America/New_York');
+
         global $wpdb;
         $this->schedule_table = $wpdb->prefix . 'cablecast_schedule_items';
 
