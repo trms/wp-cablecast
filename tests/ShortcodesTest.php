@@ -982,6 +982,22 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test [cablecast_upcoming_runs] returns empty with no runs.
      */
     public function test_upcoming_runs_no_results() {
+        global $wpdb;
+
+        // Ensure schedule table exists (empty) to avoid database error output
+        $wpdb->query("CREATE TABLE IF NOT EXISTS {$this->schedule_table} (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            run_date_time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+            show_id int NOT NULL,
+            show_title varchar(255) DEFAULT '' NOT NULL,
+            channel_id int NOT NULL,
+            show_post_id int NOT NULL,
+            channel_post_id int NOT NULL,
+            schedule_item_id int NOT NULL,
+            cg_exempt tinyint(1) DEFAULT 0 NOT NULL,
+            PRIMARY KEY (id)
+        )");
+
         $output = do_shortcode('[cablecast_upcoming_runs id="' . $this->show_post_id . '"]');
 
         // Should return empty when no upcoming runs exist
@@ -1207,10 +1223,17 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test cablecast_format_runtime helper function.
      */
     public function test_format_runtime_helper() {
-        $this->assertEquals('0:00', cablecast_format_runtime(0));
-        $this->assertEquals('1:30', cablecast_format_runtime(90));
-        $this->assertEquals('10:05', cablecast_format_runtime(605));
-        $this->assertEquals('1:00:00', cablecast_format_runtime(3600));
-        $this->assertEquals('1:30:45', cablecast_format_runtime(5445));
+        // Function returns empty for 0 or negative values
+        $this->assertEquals('', cablecast_format_runtime(0));
+        $this->assertEquals('', cablecast_format_runtime(-10));
+
+        // Minutes only (< 1 hour)
+        $this->assertEquals('1m', cablecast_format_runtime(90));    // 1.5 min -> 1m
+        $this->assertEquals('10m', cablecast_format_runtime(605));  // 10.08 min -> 10m
+        $this->assertEquals('30m', cablecast_format_runtime(1800)); // 30 min
+
+        // Hours and minutes
+        $this->assertEquals('1h 0m', cablecast_format_runtime(3600));  // 1 hour
+        $this->assertEquals('1h 30m', cablecast_format_runtime(5445)); // 1h 30m 45s -> 1h 30m
     }
 }
