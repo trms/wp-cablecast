@@ -352,20 +352,20 @@ add_filter( 'post_thumbnail_html', function ( $html, $post_id, $thumb_id, $size,
     $target_id = cablecast_current_show_post_id( $post_id );
 
     if ( cablecast_has_real_featured_image( $target_id ) ) {
-        \Cablecast\Logger::log('info', "THUMB_HTML: valid real featured image ($thumb_id) exists, leaving html unchanged");
+        \Cablecast\Logger::log('debug', "THUMB_HTML: valid real featured image ($thumb_id) exists, leaving html unchanged");
         return $html;
     }
 
 
 
     $src = cablecast_show_thumbnail_url( $target_id, $size );
-    
+
     if ( ! $src ) {
-        \Cablecast\Logger::log('info', "THUMB_HTML: no CDN url built, returning original html");
+        \Cablecast\Logger::log('debug', "THUMB_HTML: no CDN url built, returning original html");
         return $html;
     }
 
-    \Cablecast\Logger::log('info', "THUMB_HTML: replacing html with CDN img: {$src}");
+    \Cablecast\Logger::log('debug', "THUMB_HTML: replacing html with CDN img: {$src}");
 
     $defaults = [
         'alt'     => get_the_title( $target_id ),
@@ -390,27 +390,27 @@ add_filter( 'post_thumbnail_url', function ( $url, $post, $size ) {
     $target_id = cablecast_current_show_post_id( $pid );
 
     if ( cablecast_has_real_featured_image( $target_id ) ) {
-        \Cablecast\Logger::log('info', "THUMB_HTML: valid real featured image ($thumb_id) exists, leaving html unchanged");
+        \Cablecast\Logger::log('debug', "THUMB_URL: valid real featured image exists, leaving url unchanged");
         return $url;
     }
 
-    \Cablecast\Logger::log('info', "THUMB_URL: called with raw_post=" . (is_object($post)? "WP_Post({$post->ID})" : var_export($post, true)) .
+    \Cablecast\Logger::log('debug', "THUMB_URL: called with raw_post=" . (is_object($post)? "WP_Post({$post->ID})" : var_export($post, true)) .
                ", resolved target_id={$target_id}, size=" . print_r($size, true) .
                ", incoming url=" . var_export($url, true) );
 
     if ( ! $target_id ) {
-        \Cablecast\Logger::log('info', "THUMB_URL: no target_id, returning original url" );
+        \Cablecast\Logger::log('debug', "THUMB_URL: no target_id, returning original url" );
         return $url;
     }
 
     if ( metadata_exists( 'post', $target_id, '_thumbnail_id' ) && empty($url) == false ) {
-        \Cablecast\Logger::log('info', "THUMB_URL: real featured image exists, returning original url: $url" );
+        \Cablecast\Logger::log('debug', "THUMB_URL: real featured image exists, returning original url: $url" );
         return $url;
     }
 
     $custom = cablecast_show_thumbnail_url( $target_id, $size );
 
-    \Cablecast\Logger::log('info', "THUMB_URL: built custom url=" . var_export($custom, true) );
+    \Cablecast\Logger::log('debug', "THUMB_URL: built custom url=" . var_export($custom, true) );
 
     return $custom ?: $url;
 }, 10, 3 );

@@ -65,7 +65,40 @@ function cablecast_install() {
 }
 register_activation_hook( __FILE__, 'cablecast_install' );
 
+/**
+ * Check if database needs upgrade and run dbDelta if so.
+ * This handles adding new columns (like cg_exempt) to existing installations.
+ */
+function cablecast_maybe_upgrade() {
+    global $wpdb;
+    global $cablecast_db_version;
 
+    $installed_ver = get_option('cablecast_db_version');
+
+    if ($installed_ver !== $cablecast_db_version) {
+        $table_name = $wpdb->prefix . 'cablecast_schedule_items';
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $sql = "CREATE TABLE $table_name (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            run_date_time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+            show_id int NOT NULL,
+            show_title varchar(255) DEFAULT '' NOT NULL,
+            channel_id int NOT NULL,
+            show_post_id int NOT NULL,
+            channel_post_id int NOT NULL,
+            schedule_item_id int NOT NULL,
+            cg_exempt tinyint(1) DEFAULT 0 NOT NULL,
+            PRIMARY KEY  (id)
+        ) $charset_collate;";
+
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+
+        update_option('cablecast_db_version', $cablecast_db_version);
+    }
+}
+add_action('plugins_loaded', 'cablecast_maybe_upgrade');
 
 // Load Settings Stuff For Admin Users
 if ( is_admin() ) {
