@@ -1,0 +1,182 @@
+/**
+ * Cablecast Shortcode Documentation - Admin Styles
+ */
+
+/* Main container */
+.cablecast-shortcode-docs {
+    max-width: 1200px;
+}
+
+.cablecast-shortcode-docs .nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+
+.cablecast-shortcode-docs .nav-tab {
+    font-size: 13px;
+}
+
+/* Description callout */
+.cablecast-docs-description {
+    background: #fff;
+    padding: 15px 20px;
+    border-left: 4px solid #2271b1;
+    margin-bottom: 25px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+}
+
+.cablecast-docs-description p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Index page */
+.cablecast-docs-index p {
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.cablecast-docs-index .notice {
+    margin: 15px 0 20px;
+}
+
+/* Attributes table */
+.cablecast-attributes-table {
+    margin-bottom: 30px;
+}
+
+.cablecast-attributes-table th {
+    background: #f0f0f1;
+    font-weight: 600;
+}
+
+.cablecast-attributes-table td code {
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.cablecast-required-badge {
+    display: inline-block;
+    background: #d63638;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+/* Code blocks */
+.cablecast-docs-example {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.cablecast-docs-example h4 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cablecast-code-block-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.cablecast-code-block {
+    flex: 1;
+    background: #23282d;
+    color: #e6e6e6;
+    padding: 12px 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: Consolas, Monaco, 'Andale Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.cablecast-code-block-wrapper .button {
+    flex-shrink: 0;
+}
+
+/* Live preview */
+.cablecast-docs-preview {
+    background: #f6f7f7;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+.cablecast-docs-preview__content {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    overflow: auto;
+    max-height: 500px;
+}
+
+.cablecast-docs-no-preview {
+    color: #666;
+    font-style: italic;
+    margin: 0;
+}
+
+/* Section headings */
+.cablecast-docs-detail h3 {
+    margin-top: 30px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+    font-size: 16px;
+}
+
+.cablecast-docs-detail h3:first-child {
+    margin-top: 0;
+}
+
+/* Copy button states */
+.cablecast-copy-btn {
+    min-width: 60px;
+    text-align: center;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .cablecast-shortcode-docs .nav-tab-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .cablecast-shortcode-docs .nav-tab {
+        flex: 0 0 auto;
+        margin: 0;
+    }
+
+    .cablecast-code-block-wrapper {
+        flex-direction: column;
+    }
+
+    .cablecast-code-block-wrapper .button {
+        align-self: flex-end;
+    }
+
+    .cablecast-attributes-table th:nth-child(3),
+    .cablecast-attributes-table th:nth-child(4),
+    .cablecast-attributes-table td:nth-child(3),
+    .cablecast-attributes-table td:nth-child(4) {
+        display: none;
+    }
+}

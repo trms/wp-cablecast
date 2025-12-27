@@ -1,8 +1,11 @@
 <?php
 
 function cablecast_get_schedules($channel_id, $date_start, $date_end = NULL) {
-  // Get the WordPress site timezone
+  // Get the WordPress site timezone (fall back to UTC if not set)
   $timezone = get_option('timezone_string');
+  if (empty($timezone)) {
+    $timezone = 'UTC';
+  }
 
   if (empty($date_start)) {
     $date_start = current_time('Y-m-d');

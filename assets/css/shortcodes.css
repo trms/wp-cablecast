@@ -1,0 +1,1497 @@
+/**
+ * Cablecast Shortcode Styles
+ *
+ * Professional default styles for Cablecast shortcodes.
+ * Can be disabled in plugin settings for full theme control.
+ */
+
+/* ==========================================================================
+   Base & Reset
+   ========================================================================== */
+
+.cablecast-error,
+.cablecast-no-results {
+    padding: 1rem;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.cablecast-error {
+    color: #dc2626;
+}
+
+/* ==========================================================================
+   Broken Image Handling
+   Hide broken images gracefully instead of showing browser's broken icon
+   ========================================================================== */
+
+.cablecast-schedule__thumbnail img,
+.cablecast-now-playing__thumbnail img,
+.cablecast-shows__thumbnail img,
+.cablecast-show__thumbnail img,
+.cablecast-series__thumbnail img {
+    /* Ensure images have minimum size for loading state */
+    min-height: 50px;
+}
+
+/* Hide broken images - the :not([src]) prevents hiding during initial load */
+.cablecast-schedule__thumbnail img:not([src=""]),
+.cablecast-now-playing__thumbnail img:not([src=""]),
+.cablecast-shows__thumbnail img:not([src=""]),
+.cablecast-show__thumbnail img:not([src=""]),
+.cablecast-series__thumbnail img:not([src=""]) {
+    /* Use object-fit to handle images that fail gracefully */
+    object-fit: cover;
+}
+
+/* Style broken images with a placeholder background */
+.cablecast-schedule__thumbnail,
+.cablecast-now-playing__thumbnail,
+.cablecast-shows__thumbnail,
+.cablecast-show__thumbnail,
+.cablecast-series__thumbnail {
+    background-color: #f3f4f6;
+    background-image: linear-gradient(135deg, #e5e7eb 25%, transparent 25%),
+                      linear-gradient(225deg, #e5e7eb 25%, transparent 25%),
+                      linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+                      linear-gradient(315deg, #e5e7eb 25%, #f3f4f6 25%);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 0, 10px -10px, 0px 10px;
+}
+
+/* ==========================================================================
+   Schedule Shortcode
+   ========================================================================== */
+
+.cablecast-schedule {
+    max-width: 800px;
+}
+
+.cablecast-schedule__day-divider {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    padding: 0.75rem 0 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cablecast-schedule__day-group {
+    margin-bottom: 1.5rem;
+}
+
+.cablecast-schedule__item {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-left: 4px solid #e5e7eb;
+    background: #fff;
+    margin-bottom: 0.5rem;
+    border-radius: 0 0.25rem 0.25rem 0;
+    transition: background-color 0.15s ease;
+}
+
+.cablecast-schedule__item:hover {
+    background: #f9fafb;
+}
+
+.cablecast-schedule__thumbnail {
+    flex-shrink: 0;
+    width: 80px;
+    height: 45px;
+    overflow: hidden;
+    border-radius: 0.25rem;
+    background: #f3f4f6;
+}
+
+.cablecast-schedule__thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cablecast-schedule__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.cablecast-schedule__time {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 500;
+    margin-bottom: 0.125rem;
+}
+
+.cablecast-schedule__title {
+    display: block;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    line-height: 1.3;
+}
+
+a.cablecast-schedule__title:hover {
+    color: #2563eb;
+}
+
+.cablecast-schedule__description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0.25rem 0 0;
+    line-height: 1.4;
+}
+
+/* ==========================================================================
+   Now Playing Shortcode
+   ========================================================================== */
+
+.cablecast-now-playing {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.cablecast-now-playing__card {
+    flex: 1;
+    min-width: 280px;
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-top: 4px solid #e5e7eb;
+}
+
+.cablecast-now-playing__card--now {
+    border-top-color: #22c55e;
+}
+
+.cablecast-now-playing__card--next {
+    border-top-color: #3b82f6;
+}
+
+.cablecast-now-playing__badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    background: #f3f4f6;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+}
+
+.cablecast-now-playing__badge--live {
+    background: #dcfce7;
+    color: #166534;
+    animation: cablecast-pulse 2s ease-in-out infinite;
+}
+
+@keyframes cablecast-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.cablecast-now-playing__thumbnail {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 0.375rem;
+    margin-bottom: 0.75rem;
+    background: #f3f4f6;
+}
+
+.cablecast-now-playing__thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cablecast-now-playing__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.cablecast-now-playing__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    line-height: 1.3;
+}
+
+a.cablecast-now-playing__title:hover {
+    color: #2563eb;
+}
+
+.cablecast-now-playing__time {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.cablecast-now-playing__progress {
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    margin-top: 0.75rem;
+    overflow: hidden;
+}
+
+.cablecast-now-playing__progress-bar {
+    height: 100%;
+    background: #22c55e;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.cablecast-now-playing__description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0.5rem 0 0;
+    line-height: 1.4;
+}
+
+.cablecast-now-playing__no-show {
+    color: #6b7280;
+    font-style: italic;
+    margin: 0;
+}
+
+/* ==========================================================================
+   Weekly Guide Shortcode
+   ========================================================================== */
+
+.cablecast-weekly-guide {
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.cablecast-weekly-guide__channel-switcher {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cablecast-weekly-guide__channel-switcher label {
+    font-weight: 500;
+    color: #374151;
+}
+
+.cablecast-weekly-guide__channel-switcher select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    font-size: 0.875rem;
+    color: #374151;
+}
+
+.cablecast-weekly-guide__grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: #e5e7eb;
+}
+
+@media (max-width: 1024px) {
+    .cablecast-weekly-guide__grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .cablecast-weekly-guide__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cablecast-weekly-guide__day {
+    background: #fff;
+    min-height: 300px;
+}
+
+.cablecast-weekly-guide__day--today {
+    background: #fefce8;
+}
+
+.cablecast-weekly-guide__day-header {
+    padding: 0.75rem;
+    background: #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: center;
+}
+
+.cablecast-weekly-guide__day--today .cablecast-weekly-guide__day-header {
+    background: #fef08a;
+}
+
+.cablecast-weekly-guide__day-name {
+    display: block;
+    font-weight: 600;
+    color: #111827;
+    font-size: 0.875rem;
+}
+
+.cablecast-weekly-guide__day-date {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.cablecast-weekly-guide__programs {
+    padding: 0.5rem;
+}
+
+.cablecast-weekly-guide__no-programs {
+    padding: 1rem;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+.cablecast-weekly-guide__program {
+    padding: 0.5rem;
+    border-left: 3px solid transparent;
+    border-radius: 0 0.25rem 0.25rem 0;
+    margin-bottom: 0.25rem;
+    transition: background-color 0.15s ease;
+}
+
+.cablecast-weekly-guide__program:hover {
+    background: #f9fafb;
+}
+
+.cablecast-weekly-guide__program--current {
+    background: #ecfdf5;
+    border-left-color: #22c55e;
+}
+
+.cablecast-weekly-guide__program-time {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.cablecast-weekly-guide__program-title {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #111827;
+    text-decoration: none;
+    line-height: 1.3;
+}
+
+a.cablecast-weekly-guide__program-title:hover {
+    color: #2563eb;
+}
+
+.cablecast-weekly-guide__program-desc {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin: 0.25rem 0 0;
+    line-height: 1.3;
+}
+
+/* ==========================================================================
+   Shows Grid/List
+   ========================================================================== */
+
+.cablecast-shows {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.cablecast-shows--grid {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.cablecast-shows--columns-2 { grid-template-columns: repeat(2, 1fr); }
+.cablecast-shows--columns-3 { grid-template-columns: repeat(3, 1fr); }
+.cablecast-shows--columns-4 { grid-template-columns: repeat(4, 1fr); }
+.cablecast-shows--columns-5 { grid-template-columns: repeat(5, 1fr); }
+.cablecast-shows--columns-6 { grid-template-columns: repeat(6, 1fr); }
+
+@media (max-width: 1024px) {
+    .cablecast-shows--grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .cablecast-shows--grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .cablecast-shows--grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cablecast-shows--list {
+    grid-template-columns: 1fr;
+}
+
+.cablecast-shows--list .cablecast-shows__item {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.cablecast-shows--list .cablecast-shows__thumbnail {
+    width: 120px;
+    flex-shrink: 0;
+}
+
+.cablecast-shows__item {
+    background: #fff;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.15s ease;
+}
+
+.cablecast-shows__item:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.cablecast-shows__thumbnail {
+    display: block;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.cablecast-shows__thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.cablecast-shows__item:hover .cablecast-shows__thumbnail img {
+    transform: scale(1.05);
+}
+
+.cablecast-shows__content {
+    padding: 0.75rem;
+}
+
+.cablecast-shows__title {
+    display: block;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    line-height: 1.3;
+    margin-bottom: 0.25rem;
+}
+
+a.cablecast-shows__title:hover {
+    color: #2563eb;
+}
+
+.cablecast-shows__runtime {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.cablecast-shows__pagination {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.cablecast-shows__pagination .page-numbers {
+    display: inline-block;
+    padding: 0.5rem 0.75rem;
+    margin: 0 0.125rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    color: #374151;
+    transition: all 0.15s ease;
+}
+
+.cablecast-shows__pagination .page-numbers:hover {
+    background: #f3f4f6;
+}
+
+.cablecast-shows__pagination .page-numbers.current {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+}
+
+/* Featured layout */
+.cablecast-shows--featured {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.cablecast-shows--featured .cablecast-shows__item--featured {
+    grid-column: span 2;
+    grid-row: span 2;
+}
+
+.cablecast-shows--featured .cablecast-shows__item--featured .cablecast-shows__thumbnail {
+    aspect-ratio: 16 / 9;
+}
+
+.cablecast-shows--featured .cablecast-shows__item--featured .cablecast-shows__content {
+    padding: 1.25rem;
+}
+
+.cablecast-shows--featured .cablecast-shows__item--featured .cablecast-shows__title {
+    font-size: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+    .cablecast-shows--featured {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .cablecast-shows--featured .cablecast-shows__item--featured {
+        grid-column: span 2;
+        grid-row: span 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .cablecast-shows--featured {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .cablecast-shows--featured .cablecast-shows__item--featured {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 480px) {
+    .cablecast-shows--featured {
+        grid-template-columns: 1fr;
+    }
+
+    .cablecast-shows--featured .cablecast-shows__item--featured {
+        grid-column: span 1;
+        grid-row: span 1;
+    }
+}
+
+/* Runtime badge overlay */
+.cablecast-shows__thumbnail {
+    position: relative;
+}
+
+.cablecast-shows__runtime-badge {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+}
+
+/* Category tag */
+.cablecast-shows__category {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    border-left: 2px solid transparent;
+    text-decoration: none;
+    margin-top: 0.25rem;
+}
+
+.cablecast-shows__category:hover {
+    background: #e5e7eb;
+    text-decoration: none;
+}
+
+/* ==========================================================================
+   Categories Shortcode
+   ========================================================================== */
+
+.cablecast-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.cablecast-categories--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.cablecast-categories--list {
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.cablecast-categories__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: #f3f4f6;
+    border-radius: 9999px;
+    text-decoration: none;
+    color: #374151;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.cablecast-categories__item:hover {
+    background: #e5e7eb;
+    text-decoration: none;
+}
+
+.cablecast-categories--grid .cablecast-categories__item,
+.cablecast-categories--list .cablecast-categories__item {
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid #e5e7eb;
+}
+
+.cablecast-categories__color {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cablecast-categories__name {
+    flex: 1;
+}
+
+.cablecast-categories__count {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    background: #fff;
+    padding: 0.125rem 0.375rem;
+    border-radius: 9999px;
+}
+
+/* ==========================================================================
+   Single Show
+   ========================================================================== */
+
+.cablecast-show {
+    max-width: 900px;
+}
+
+.cablecast-show__vod {
+    aspect-ratio: 16 / 9;
+    margin-bottom: 1.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #000;
+}
+
+.cablecast-show__vod iframe,
+.cablecast-show__vod video {
+    width: 100%;
+    height: 100%;
+}
+
+.cablecast-show__thumbnail {
+    margin-bottom: 1.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.cablecast-show__thumbnail img {
+    width: 100%;
+    height: auto;
+}
+
+.cablecast-show__content {
+    padding: 0;
+}
+
+.cablecast-show__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.75rem;
+    line-height: 1.2;
+}
+
+.cablecast-show__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.cablecast-show__meta a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.cablecast-show__meta a:hover {
+    text-decoration: underline;
+}
+
+.cablecast-show__description {
+    color: #374151;
+    line-height: 1.6;
+}
+
+.cablecast-show__description p {
+    margin: 0 0 1rem;
+}
+
+/* ==========================================================================
+   VOD Player
+   ========================================================================== */
+
+.cablecast-vod-player {
+    aspect-ratio: 16 / 9;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #000;
+}
+
+.cablecast-vod-player iframe,
+.cablecast-vod-player video {
+    width: 100%;
+    height: 100%;
+}
+
+/* ==========================================================================
+   Producers
+   ========================================================================== */
+
+.cablecast-producers {
+    display: grid;
+    gap: 1rem;
+}
+
+.cablecast-producers--grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.cablecast-producers--list {
+    grid-template-columns: 1fr;
+}
+
+.cablecast-producers__item {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.cablecast-producers__name {
+    display: block;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    margin-bottom: 0.25rem;
+}
+
+a.cablecast-producers__name:hover {
+    color: #2563eb;
+}
+
+.cablecast-producers__count {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.cablecast-producers__contact {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.cablecast-producers__contact a {
+    display: block;
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.cablecast-producers__contact a:hover {
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   Series
+   ========================================================================== */
+
+.cablecast-series {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.cablecast-series--grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.cablecast-series--list {
+    grid-template-columns: 1fr;
+}
+
+.cablecast-series--list .cablecast-series__item {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.cablecast-series--list .cablecast-series__thumbnail {
+    width: 150px;
+    flex-shrink: 0;
+}
+
+.cablecast-series__item {
+    background: #fff;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.15s ease;
+}
+
+.cablecast-series__item:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.cablecast-series__thumbnail {
+    display: block;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.cablecast-series__thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.cablecast-series__item:hover .cablecast-series__thumbnail img {
+    transform: scale(1.05);
+}
+
+.cablecast-series__content {
+    padding: 0.75rem;
+}
+
+.cablecast-series__name {
+    display: block;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    line-height: 1.3;
+    margin-bottom: 0.25rem;
+}
+
+a.cablecast-series__name:hover {
+    color: #2563eb;
+}
+
+.cablecast-series__count {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+/* ==========================================================================
+   Chapters Shortcode
+   ========================================================================== */
+
+.cablecast-chapters {
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.cablecast-chapters__heading {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cablecast-chapters__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.cablecast-chapters__item {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.15s ease;
+}
+
+.cablecast-chapters__item:last-child {
+    border-bottom: none;
+}
+
+.cablecast-chapters__item:hover {
+    background: #f9fafb;
+}
+
+.cablecast-chapters__item--current {
+    background: #ecfdf5;
+    border-left: 3px solid #22c55e;
+    margin-left: -1rem;
+    padding-left: calc(1rem - 3px);
+}
+
+.cablecast-chapters__button {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.25rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    transition: color 0.15s ease;
+}
+
+.cablecast-chapters__button:hover {
+    color: #2563eb;
+}
+
+.cablecast-chapters__timestamp {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.cablecast-chapters__item--current .cablecast-chapters__timestamp {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.cablecast-chapters__title {
+    flex: 1;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+    line-height: 1.3;
+}
+
+.cablecast-chapters__description {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    margin: 0.25rem 0 0;
+    padding-left: calc(0.75rem + 3rem);
+    line-height: 1.4;
+}
+
+/* Compact layout variation */
+.cablecast-chapters--compact .cablecast-chapters__item {
+    padding: 0.25rem 0;
+}
+
+.cablecast-chapters--compact .cablecast-chapters__description {
+    display: none;
+}
+
+.cablecast-chapters--compact .cablecast-chapters__list {
+    max-height: 250px;
+}
+
+/* ==========================================================================
+   SHOW SINGLE PAGE (Default Template)
+   ========================================================================== */
+
+.cablecast-show-single {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.cablecast-show-single__header {
+    margin-bottom: 1.5rem;
+}
+
+.cablecast-show-single__title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.cablecast-show-single__player {
+    margin-bottom: 1.5rem;
+}
+
+.cablecast-show-single__player .cablecast-vod-player {
+    aspect-ratio: 16 / 9;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #000;
+}
+
+.cablecast-show-single__player .cablecast-vod-player iframe,
+.cablecast-show-single__player .cablecast-vod-player video {
+    width: 100%;
+    height: 100%;
+}
+
+.cablecast-show-single__poster {
+    aspect-ratio: 16 / 9;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.cablecast-show-single__poster-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cablecast-show-single__content {
+    padding: 0;
+}
+
+.cablecast-show-single__description {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    color: #374151;
+    margin-bottom: 1.5rem;
+}
+
+.cablecast-show-single__description p:last-child {
+    margin-bottom: 0;
+}
+
+.cablecast-show-single__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    padding: 1.25rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.cablecast-show-single__meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.cablecast-show-single__meta-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+}
+
+.cablecast-show-single__meta-value {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #111827;
+    text-decoration: none;
+}
+
+a.cablecast-show-single__meta-value:hover {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   UPCOMING RUNS SHORTCODE
+   ========================================================================== */
+
+.cablecast-upcoming-runs {
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-top: 1.5rem;
+}
+
+.cablecast-upcoming-runs__heading {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cablecast-upcoming-runs__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cablecast-upcoming-runs__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.cablecast-upcoming-runs__item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.cablecast-upcoming-runs__date {
+    font-weight: 600;
+    color: #111827;
+    min-width: 150px;
+}
+
+.cablecast-upcoming-runs__time {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.cablecast-upcoming-runs__channel {
+    margin-left: auto;
+    font-size: 0.875rem;
+    color: #2563eb;
+    text-decoration: none;
+    padding: 0.25rem 0.75rem;
+    background: #eff6ff;
+    border-radius: 9999px;
+}
+
+.cablecast-upcoming-runs__channel:hover {
+    background: #dbeafe;
+    text-decoration: none;
+}
+
+@media (max-width: 640px) {
+    .cablecast-upcoming-runs__item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .cablecast-upcoming-runs__channel {
+        margin-left: 0;
+        margin-top: 0.25rem;
+    }
+}
+
+/* ==========================================================================
+   CHANNEL SINGLE PAGE (Default Template)
+   ========================================================================== */
+
+.cablecast-channel-single {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.cablecast-channel-single__header {
+    margin-bottom: 1.5rem;
+}
+
+.cablecast-channel-single__title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.cablecast-channel-single__player {
+    margin-bottom: 2rem;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.cablecast-channel-single__player iframe,
+.cablecast-channel-single__player video {
+    width: 100%;
+    height: 100%;
+}
+
+.cablecast-channel-single__now-playing {
+    margin-bottom: 2rem;
+}
+
+.cablecast-channel-single__description {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #374151;
+    margin-bottom: 2rem;
+    padding: 1.25rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+}
+
+.cablecast-channel-single__schedule {
+    margin-top: 2rem;
+}
+
+.cablecast-channel-single__schedule-heading {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1rem;
+}
+
+/* FullCalendar container styling for channel pages */
+.cablecast-channel-single .cablecast-fullcalendar {
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================================================
+   TAXONOMY ARCHIVES
+   ========================================================================== */
+
+.cablecast-taxonomy-archive {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.cablecast-taxonomy-archive__header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cablecast-taxonomy-archive__title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.5rem;
+    line-height: 1.2;
+}
+
+.cablecast-taxonomy-archive__description {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #4b5563;
+    margin-bottom: 0.5rem;
+}
+
+.cablecast-taxonomy-archive__count {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* ==========================================================================
+   SHOWS & CHANNELS ARCHIVES
+   ========================================================================== */
+
+.cablecast-archive {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.cablecast-archive__header {
+    margin-bottom: 2rem;
+}
+
+.cablecast-archive__title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+    line-height: 1.2;
+}
+
+/* Channel cards grid */
+.cablecast-channels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.cablecast-channel-card {
+    background: #fff;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+}
+
+.cablecast-channel-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.cablecast-channel-card__thumbnail {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.cablecast-channel-card__thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cablecast-channel-card__content {
+    padding: 1rem;
+}
+
+.cablecast-channel-card__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    line-height: 1.3;
+}
+
+.cablecast-channel-card__title a {
+    color: #111827;
+    text-decoration: none;
+}
+
+.cablecast-channel-card__title a:hover {
+    color: #2563eb;
+}
+
+.cablecast-channel-card__excerpt {
+    font-size: 0.875rem;
+    color: #6b7280;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+}
+
+.cablecast-channel-card__link {
+    display: inline-block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.cablecast-channel-card__link:hover {
+    text-decoration: underline;
+}
+
+/* Show cards (used in content-show.php partial) */
+.cablecast-show-card {
+    background: #fff;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+}
+
+.cablecast-show-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.cablecast-show-card__thumbnail {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.cablecast-show-card__thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.cablecast-show-card:hover .cablecast-show-card__thumbnail-img {
+    transform: scale(1.05);
+}
+
+.cablecast-show-card__content {
+    padding: 1rem;
+}
+
+.cablecast-show-card__title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    line-height: 1.3;
+}
+
+.cablecast-show-card__title a {
+    color: #111827;
+    text-decoration: none;
+}
+
+.cablecast-show-card__title a:hover {
+    color: #2563eb;
+}
+
+.cablecast-show-card__runtime {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+
+.cablecast-show-card__category {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .cablecast-show-single__title,
+    .cablecast-channel-single__title,
+    .cablecast-taxonomy-archive__title,
+    .cablecast-archive__title {
+        font-size: 1.5rem;
+    }
+
+    .cablecast-show-single__meta {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .cablecast-channels-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .cablecast-show-single__meta {
+        grid-template-columns: 1fr;
+    }
+}

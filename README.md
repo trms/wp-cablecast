@@ -95,6 +95,17 @@ The plugin provides a function `cablecast_get_schedules($channel_id, $date_start
 |`channel_post_id`| |
 |`schedule_item_id`| |
 
+**Important: Timezone Handling**
+
+The `cablecast_get_schedules()` function automatically handles timezone conversion. Schedule times are stored in UTC in the database and converted to your WordPress site's configured timezone (Settings > General > Timezone) when retrieved.
+
+Always use `cablecast_get_schedules()` to query schedules rather than direct database queries. This ensures:
+- Dates you pass in are interpreted in your site's timezone
+- Returned `run_date_time` values are in your site's timezone
+- Correct schedule items are returned for the requested date range
+
+Make sure your WordPress timezone is configured correctly in Settings > General for accurate schedule display.
+
 ### How do I show the live stream for a channel?
 The plugin sets a custom meta property of `cablecast_channel_live_embed_code` to the channel for the embed code to watch the live stream. If this property isn't set it's likely your Cablecast isn't configured correctly, or you don't have a live streaming server.
 
