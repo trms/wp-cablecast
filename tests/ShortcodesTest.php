@@ -998,6 +998,9 @@ class ShortcodesTest extends WP_UnitTestCase {
             PRIMARY KEY (id)
         )");
 
+        // Clear any data from previous tests
+        $wpdb->query("TRUNCATE TABLE {$this->schedule_table}");
+
         $output = do_shortcode('[cablecast_upcoming_runs id="' . $this->show_post_id . '"]');
 
         // Should return empty when no upcoming runs exist
