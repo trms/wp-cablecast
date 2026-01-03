@@ -13,6 +13,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         initWeeklyGuide();
         initNowPlayingProgress();
+        initCablecastHome();
     });
 
     /**
@@ -85,6 +86,26 @@
                 bar.style.width = newWidth + '%';
             });
         }, 30000);
+    }
+
+    /**
+     * Initialize Cablecast Home functionality.
+     */
+    function initCablecastHome() {
+        var homeContainers = document.querySelectorAll('.cablecast-home');
+
+        homeContainers.forEach(function(container) {
+            var tabs = container.querySelectorAll('.cablecast-home__channel-tab');
+
+            tabs.forEach(function(tab) {
+                tab.addEventListener('click', function() {
+                    var channelId = this.dataset.channel;
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('channel', channelId);
+                    window.location.href = url.toString();
+                });
+            });
+        });
     }
 
 })();

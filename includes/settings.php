@@ -108,12 +108,48 @@ function cablecast_get_custom_taxonomies() {
 }
 
 /**
+ * Sanitize the cablecast options.
+ * Ensures checkbox fields are properly saved as false when unchecked.
+ */
+function cablecast_sanitize_options($input) {
+    $current_options = get_option('cablecast_options', []);
+
+    // Define checkbox fields that need explicit false handling
+    $checkbox_fields = [
+        'shortcode_styles',
+        'delete_local_thumbnails',
+        'enable_category_colors',
+    ];
+
+    // If input is not an array, return current options
+    if (!is_array($input)) {
+        return $current_options;
+    }
+
+    // Merge with current options
+    $output = array_merge($current_options, $input);
+
+    // Handle checkbox fields - if not present in input, set to false
+    foreach ($checkbox_fields as $field) {
+        if (!isset($input[$field])) {
+            $output[$field] = false;
+        } else {
+            $output[$field] = (bool) $input[$field];
+        }
+    }
+
+    return $output;
+}
+
+/**
  * custom option and settings
  */
 function cablecast_settings_init()
 {
-    // register a new setting for "cablecast" page
-    register_setting('cablecast', 'cablecast_options');
+    // register a new setting for "cablecast" page with sanitization callback
+    register_setting('cablecast', 'cablecast_options', [
+        'sanitize_callback' => 'cablecast_sanitize_options',
+    ]);
 
     // register a new section in the "cablecast" page
     add_settings_section(
@@ -579,7 +615,8 @@ function cablecast_section_shortcodes_cb($args)
 function cablecast_field_shortcode_styles_cb($args)
 {
     $options = get_option('cablecast_options');
-    $styles_enabled = !isset($options['shortcode_styles']) || $options['shortcode_styles'];
+    // Default to true if never saved, otherwise use the saved value
+    $styles_enabled = !isset($options['shortcode_styles']) ? true : (bool) $options['shortcode_styles'];
     ?>
     <fieldset>
         <label>

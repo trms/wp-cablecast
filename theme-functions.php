@@ -35,8 +35,10 @@ function cablecast_get_schedules($channel_id, $date_start, $date_end = NULL) {
   ));
 
   // Convert the retrieved run_date_time from UTC to the site timezone
+  // Also add run_timestamp for timezone-safe comparisons in shortcodes
   foreach ($results as $result) {
     $run_date_time_utc = new DateTime($result->run_date_time, new DateTimeZone('UTC'));
+    $result->run_timestamp = $run_date_time_utc->getTimestamp();
     $run_date_time_utc->setTimezone(new DateTimeZone($timezone));
     $result->run_date_time = $run_date_time_utc->format('Y-m-d H:i:s');
   }
