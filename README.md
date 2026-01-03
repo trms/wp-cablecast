@@ -48,6 +48,33 @@ A Cablecast show is the primary resource in Cablecast. It describes a program th
 |`cablecast_show_custom_7`| |
 |`cablecast_show_custom_8`| |
 |`cablecast_last_modified`| |
+|`cablecast_show_cg_exempt`| Whether the show is CG exempt (automatically hidden from listings) |
+
+### Hiding Content from Listings
+
+You can hide shows, producers, series, or categories from all plugin-controlled listings without deleting them.
+
+#### Hiding Individual Shows
+1. Edit the show in WordPress admin
+2. Find the "Cablecast: Visibility" meta box in the sidebar
+3. Check "Hide from listings"
+4. Update the show
+
+#### Hiding Producers, Series, or Categories
+1. Go to Shows → Producers (or Series, or Categories)
+2. Edit the term
+3. Check "Hide from listings" in the Cablecast: Visibility section
+4. Update the term
+
+When a producer, series, or category is hidden, all associated shows are also hidden from listings.
+
+#### Automatic Hiding (CG Exempt)
+Shows marked as "CG Exempt" in Cablecast are automatically hidden from all listings. This is useful for character generator content, slides, PSAs, and filler programming that you don't want appearing in public-facing listings.
+
+**Note:** Hidden content is still accessible via direct URL - it's only removed from shortcode listings, archives, and schedule displays.
+
+#### Viewing Hidden Status
+In the Shows admin list, a hidden icon appears in the "Hidden" column for any show that is hidden (either directly, via CG exempt, or via an associated taxonomy).
 
 ### Channel
 

@@ -342,18 +342,24 @@ function cablecast_schedule_shortcode($atts) {
             continue;
         }
 
-        $item_time = strtotime($item->run_date_time);
+        // Skip hidden shows
+        if (!empty($item->show_post_id) && cablecast_is_hidden($item->show_post_id)) {
+            continue;
+        }
+
+        // Use run_timestamp for timezone-safe comparisons
+        $item_timestamp = $item->run_timestamp;
 
         switch ($mode) {
             case 'remaining':
                 // Only shows that haven't ended yet (assuming 30min default)
-                if ($item_time + 1800 > $now_timestamp) {
+                if ($item_timestamp + 1800 > $now_timestamp) {
                     $filtered_items[] = $item;
                 }
                 break;
             case 'next':
                 // Only future shows
-                if ($item_time > $now_timestamp) {
+                if ($item_timestamp > $now_timestamp) {
                     $filtered_items[] = $item;
                 }
                 break;
@@ -509,13 +515,20 @@ function cablecast_now_playing_shortcode($atts) {
         $items = array_values($items);
     }
 
+    // Filter hidden shows
+    $items = array_filter($items, function($item) {
+        return empty($item->show_post_id) || !cablecast_is_hidden($item->show_post_id);
+    });
+    $items = array_values($items);
+
     // Find current and next shows
     $current_show = null;
     $next_show = null;
 
     for ($i = 0; $i < count($items); $i++) {
         $item = $items[$i];
-        $item_start = strtotime($item->run_date_time);
+        // Use run_timestamp for timezone-safe comparisons
+        $item_start = $item->run_timestamp;
 
         // Get runtime from show meta if available
         $show = cablecast_get_show_from_schedule($item);
@@ -710,12 +723,11 @@ function cablecast_weekly_guide_shortcode($atts) {
 
     $output = '<div class="' . implode(' ', $classes) . '">';
 
-    // Channel switcher
+    // Channel switcher (JavaScript in shortcodes.js handles the change event)
     if ($show_channel_switcher && count($channels) > 1) {
-        $current_url = remove_query_arg('channel');
         $output .= '<div class="cablecast-weekly-guide__channel-switcher">';
         $output .= '<label for="cablecast-channel-select">' . __('Channel:', 'cablecast') . '</label>';
-        $output .= '<select id="cablecast-channel-select" onchange="window.location.href=\'' . esc_url($current_url) . '&channel=\' + this.value">';
+        $output .= '<select id="cablecast-channel-select">';
         foreach ($channels as $channel) {
             $selected = ($channel->ID === $channel_id) ? ' selected' : '';
             $output .= '<option value="' . esc_attr($channel->ID) . '"' . $selected . '>';
@@ -759,11 +771,16 @@ function cablecast_weekly_guide_shortcode($atts) {
             $output .= '</div>';
         } else {
             foreach ($day_items as $item) {
+                // Skip hidden shows
+                if (!empty($item->show_post_id) && cablecast_is_hidden($item->show_post_id)) {
+                    continue;
+                }
+
                 $show = cablecast_get_show_from_schedule($item);
                 $item_time = date('g:i A', strtotime($item->run_date_time));
 
-                // Determine if this is the current program
-                $item_timestamp = strtotime($item->run_date_time);
+                // Determine if this is the current program using run_timestamp for timezone-safe comparisons
+                $item_timestamp = $item->run_timestamp;
                 $is_current = false;
                 if ($is_today) {
                     $runtime = $show ? (int) get_post_meta($show->ID, 'cablecast_show_trt', true) : 1800;
@@ -919,6 +936,11 @@ function cablecast_shows_shortcode($atts) {
     while ($query->have_posts()) {
         $query->the_post();
         $show_id = get_the_ID();
+
+        // Skip hidden shows
+        if (cablecast_is_hidden($show_id)) {
+            continue;
+        }
 
         // Featured layout: first item is large
         $item_classes = ['cablecast-shows__item'];
@@ -1314,6 +1336,15 @@ function cablecast_producers_shortcode($atts) {
         return '<p class="cablecast-no-results">' . __('No producers found.', 'cablecast') . '</p>';
     }
 
+    // Filter out hidden producers
+    $terms = array_filter($terms, function($term) {
+        return !cablecast_is_term_hidden($term->term_id);
+    });
+
+    if (empty($terms)) {
+        return '<p class="cablecast-no-results">' . __('No producers found.', 'cablecast') . '</p>';
+    }
+
     $layout = in_array($atts['layout'], ['grid', 'list']) ? $atts['layout'] : 'list';
     $show_contact = filter_var($atts['show_contact'], FILTER_VALIDATE_BOOLEAN);
 
@@ -1386,6 +1417,15 @@ function cablecast_series_shortcode($atts) {
     ]);
 
     if (empty($terms) || is_wp_error($terms)) {
+        return '<p class="cablecast-no-results">' . __('No series found.', 'cablecast') . '</p>';
+    }
+
+    // Filter out hidden series
+    $terms = array_filter($terms, function($term) {
+        return !cablecast_is_term_hidden($term->term_id);
+    });
+
+    if (empty($terms)) {
         return '<p class="cablecast-no-results">' . __('No series found.', 'cablecast') . '</p>';
     }
 
@@ -1811,6 +1851,15 @@ function cablecast_categories_shortcode($atts) {
         return '';
     }
 
+    // Filter out hidden categories
+    $categories = array_filter($categories, function($term) {
+        return !cablecast_is_term_hidden($term->term_id);
+    });
+
+    if (empty($categories)) {
+        return '';
+    }
+
     // Filter to only categories with shows
     $categories_with_shows = [];
     foreach ($categories as $cat) {
@@ -1927,7 +1976,21 @@ function cablecast_home_shortcode($atts) {
 
     // Get channels
     $channels = cablecast_get_all_channels();
-    $default_channel = !empty($channels) ? $channels[0]->ID : 0;
+
+    // Check for channel in URL parameter, otherwise use first channel
+    $selected_channel = 0;
+    if (isset($_GET['channel'])) {
+        $selected_channel = absint($_GET['channel']);
+    }
+    // Validate the channel exists in our list
+    $valid_channel = false;
+    foreach ($channels as $channel) {
+        if ($channel->ID === $selected_channel) {
+            $valid_channel = true;
+            break;
+        }
+    }
+    $default_channel = $valid_channel ? $selected_channel : (!empty($channels) ? $channels[0]->ID : 0);
 
     // Get section headings from settings
     $now_playing_heading = isset($home_settings['now_playing_heading']) ? $home_settings['now_playing_heading'] : __('Now Playing', 'cablecast');
@@ -1948,11 +2011,11 @@ function cablecast_home_shortcode($atts) {
         $output .= '<section class="cablecast-home__section cablecast-home__section--now-playing">';
         $output .= '<h2 class="cablecast-home__section-heading">' . esc_html($now_playing_heading) . '</h2>';
 
-        // If multiple channels, show tabs
+        // If multiple channels, show tabs (JavaScript in shortcodes.js handles click events)
         if (count($channels) > 1) {
             $output .= '<div class="cablecast-home__channel-tabs">';
-            foreach ($channels as $index => $channel) {
-                $active = $index === 0 ? ' cablecast-home__channel-tab--active' : '';
+            foreach ($channels as $channel) {
+                $active = ($channel->ID === $default_channel) ? ' cablecast-home__channel-tab--active' : '';
                 $output .= '<button type="button" class="cablecast-home__channel-tab' . $active . '" data-channel="' . esc_attr($channel->ID) . '">';
                 $output .= esc_html($channel->post_title);
                 $output .= '</button>';
@@ -2028,11 +2091,13 @@ function cablecast_home_shortcode($atts) {
         $output .= '<h3 class="cablecast-home__browse-heading">' . esc_html__('Producers', 'cablecast') . '</h3>';
         $output .= do_shortcode('[cablecast_producers count="10" orderby="count" layout="list"]');
 
-        $producers_link = get_term_link('cablecast_producer');
-        // Note: get_term_link with just taxonomy returns WP_Error, so we link to shows archive instead
-        $output .= '<a href="' . esc_url($shows_archive ?? '#') . '" class="cablecast-home__browse-link">';
-        $output .= __('All Producers', 'cablecast') . ' &rarr;';
-        $output .= '</a>';
+        // Link to shows archive with browse parameter
+        $producers_archive = get_post_type_archive_link('show');
+        if ($producers_archive) {
+            $output .= '<a href="' . esc_url(add_query_arg('browse', 'producers', $producers_archive)) . '" class="cablecast-home__browse-link">';
+            $output .= __('All Producers', 'cablecast') . ' &rarr;';
+            $output .= '</a>';
+        }
         $output .= '</div>';
 
         $output .= '</div>'; // browse-grid

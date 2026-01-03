@@ -95,8 +95,10 @@ function cablecast_register_taxonomies() {
         'show_in_menu'      => true,
         'show_in_nav_menus' => true,
         'capabilities' => array(
-          'edit_terms' => '',
-          'delete_terms' => ''
+          'manage_terms' => 'manage_categories',
+          'edit_terms' => 'manage_categories',
+          'delete_terms' => 'manage_categories',
+          'assign_terms' => 'edit_posts'
         ),
         'rewrite'           => array(
           'slug' => 'series',
@@ -422,3 +424,264 @@ add_filter( 'post_thumbnail_url', function ( $url, $post, $size ) {
 }, 10, 3 );
 
 endif; // End remote thumbnail mode filters
+
+/**
+ * =============================================================================
+ * CONTENT VISIBILITY: Hide from Listings
+ * =============================================================================
+ * Allows hiding shows, producers, series, and categories from public listings.
+ * Hidden content is still accessible via direct URL.
+ */
+
+/**
+ * Check if a show should be hidden from listings.
+ * Checks: manual hidden flag, CG exempt status, and associated taxonomy terms.
+ *
+ * @param int $post_id The show post ID.
+ * @return bool True if the show should be hidden.
+ */
+function cablecast_is_hidden($post_id) {
+    // Check show's own hidden flag
+    if (get_post_meta($post_id, '_cablecast_hide_from_listings', true) === '1') {
+        return true;
+    }
+
+    // Check if show is CG exempt (auto-hidden)
+    if (get_post_meta($post_id, 'cablecast_show_cg_exempt', true) === '1') {
+        return true;
+    }
+
+    // Check producer
+    $producers = wp_get_post_terms($post_id, 'cablecast_producer', ['fields' => 'ids']);
+    if (!is_wp_error($producers)) {
+        foreach ($producers as $term_id) {
+            if (get_term_meta($term_id, '_cablecast_hide_from_listings', true) === '1') {
+                return true;
+            }
+        }
+    }
+
+    // Check series
+    $series = wp_get_post_terms($post_id, 'cablecast_project', ['fields' => 'ids']);
+    if (!is_wp_error($series)) {
+        foreach ($series as $term_id) {
+            if (get_term_meta($term_id, '_cablecast_hide_from_listings', true) === '1') {
+                return true;
+            }
+        }
+    }
+
+    // Check categories
+    $categories = wp_get_post_terms($post_id, 'category', ['fields' => 'ids']);
+    if (!is_wp_error($categories)) {
+        foreach ($categories as $term_id) {
+            if (get_term_meta($term_id, '_cablecast_hide_from_listings', true) === '1') {
+                return true;
+            }
+        }
+    }
+
+    // Check tags
+    $tags = wp_get_post_terms($post_id, 'post_tag', ['fields' => 'ids']);
+    if (!is_wp_error($tags)) {
+        foreach ($tags as $term_id) {
+            if (get_term_meta($term_id, '_cablecast_hide_from_listings', true) === '1') {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Check if a taxonomy term should be hidden from listings.
+ *
+ * @param int $term_id The term ID.
+ * @return bool True if the term should be hidden.
+ */
+function cablecast_is_term_hidden($term_id) {
+    return get_term_meta($term_id, '_cablecast_hide_from_listings', true) === '1';
+}
+
+/**
+ * Add visibility meta box to Show edit screen.
+ */
+add_action('add_meta_boxes', 'cablecast_add_visibility_meta_box');
+function cablecast_add_visibility_meta_box() {
+    add_meta_box(
+        'cablecast_visibility',
+        __('Cablecast: Visibility', 'cablecast'),
+        'cablecast_visibility_meta_box_callback',
+        'show',
+        'side',
+        'default'
+    );
+}
+
+/**
+ * Render the visibility meta box.
+ */
+function cablecast_visibility_meta_box_callback($post) {
+    wp_nonce_field('cablecast_visibility', 'cablecast_visibility_nonce');
+    $hidden = get_post_meta($post->ID, '_cablecast_hide_from_listings', true);
+    $cg_exempt = get_post_meta($post->ID, 'cablecast_show_cg_exempt', true) === '1';
+    ?>
+    <label>
+        <input type="checkbox" name="cablecast_hide_from_listings" value="1" <?php checked($hidden, '1'); ?>>
+        <?php _e('Hide from listings', 'cablecast'); ?>
+    </label>
+    <p class="description"><?php _e('When checked, this show will not appear in shortcode listings, archives, or schedule displays.', 'cablecast'); ?></p>
+    <?php if ($cg_exempt): ?>
+        <p class="description" style="color: #b32d2e; margin-top: 8px;">
+            <span class="dashicons dashicons-info" style="font-size: 16px; width: 16px; height: 16px;"></span>
+            <?php _e('This show is marked as CG Exempt in Cablecast and is automatically hidden from listings.', 'cablecast'); ?>
+        </p>
+    <?php endif; ?>
+    <?php
+}
+
+/**
+ * Save the visibility meta box data.
+ */
+add_action('save_post_show', 'cablecast_save_visibility_meta');
+function cablecast_save_visibility_meta($post_id) {
+    if (!isset($_POST['cablecast_visibility_nonce']) ||
+        !wp_verify_nonce($_POST['cablecast_visibility_nonce'], 'cablecast_visibility')) {
+        return;
+    }
+
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $hidden = isset($_POST['cablecast_hide_from_listings']) ? '1' : '';
+    update_post_meta($post_id, '_cablecast_hide_from_listings', $hidden);
+}
+
+/**
+ * Add visibility field to taxonomy term edit screens.
+ */
+add_action('cablecast_producer_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
+add_action('cablecast_project_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
+add_action('category_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
+add_action('post_tag_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
+
+function cablecast_taxonomy_visibility_field($term, $taxonomy) {
+    $hidden = get_term_meta($term->term_id, '_cablecast_hide_from_listings', true);
+    ?>
+    <tr class="form-field">
+        <th scope="row"><label><?php _e('Cablecast: Visibility', 'cablecast'); ?></label></th>
+        <td>
+            <label>
+                <input type="checkbox" name="cablecast_hide_from_listings" value="1" <?php checked($hidden, '1'); ?>>
+                <?php _e('Hide from listings', 'cablecast'); ?>
+            </label>
+            <p class="description"><?php _e('When checked, this item and all associated shows will not appear in shortcode listings.', 'cablecast'); ?></p>
+        </td>
+    </tr>
+    <?php
+}
+
+/**
+ * Save taxonomy term visibility meta.
+ */
+add_action('edited_cablecast_producer', 'cablecast_save_taxonomy_visibility');
+add_action('edited_cablecast_project', 'cablecast_save_taxonomy_visibility');
+add_action('edited_category', 'cablecast_save_taxonomy_visibility');
+add_action('edited_post_tag', 'cablecast_save_taxonomy_visibility');
+
+function cablecast_save_taxonomy_visibility($term_id) {
+    $hidden = isset($_POST['cablecast_hide_from_listings']) ? '1' : '';
+    update_term_meta($term_id, '_cablecast_hide_from_listings', $hidden);
+}
+
+/**
+ * Add Hidden column to Shows admin list.
+ */
+add_filter('manage_show_posts_columns', 'cablecast_add_hidden_column');
+function cablecast_add_hidden_column($columns) {
+    $new_columns = [];
+    foreach ($columns as $key => $value) {
+        $new_columns[$key] = $value;
+        // Insert after title column
+        if ($key === 'title') {
+            $new_columns['cablecast_hidden'] = __('Hidden', 'cablecast');
+        }
+    }
+    return $new_columns;
+}
+
+/**
+ * Render Hidden column content.
+ */
+add_action('manage_show_posts_custom_column', 'cablecast_hidden_column_content', 10, 2);
+function cablecast_hidden_column_content($column, $post_id) {
+    if ($column === 'cablecast_hidden') {
+        if (cablecast_is_hidden($post_id)) {
+            $cg_exempt = get_post_meta($post_id, 'cablecast_show_cg_exempt', true) === '1';
+            $title = $cg_exempt
+                ? esc_attr__('Hidden (CG Exempt)', 'cablecast')
+                : esc_attr__('Hidden from listings', 'cablecast');
+            echo '<span class="dashicons dashicons-hidden" title="' . $title . '" style="color: #b32d2e;"></span>';
+        }
+    }
+}
+
+/**
+ * Exclude hidden shows from archive pages.
+ * This filters the main query on show archives to hide manually hidden and CG exempt shows.
+ * Note: Taxonomy-based hiding is handled post-query in shortcodes since it requires multiple meta lookups.
+ */
+add_action('pre_get_posts', 'cablecast_exclude_hidden_from_archives');
+function cablecast_exclude_hidden_from_archives($query) {
+    // Only modify frontend main queries for show archives
+    if (is_admin() || !$query->is_main_query()) {
+        return;
+    }
+
+    // Check if it's a show archive or taxonomy archive
+    $is_show_archive = is_post_type_archive('show');
+    $is_show_taxonomy = is_tax('cablecast_producer') || is_tax('cablecast_project') || (is_category() && $query->get('post_type') === 'show');
+
+    if (!$is_show_archive && !$is_show_taxonomy) {
+        return;
+    }
+
+    // Get existing meta query
+    $meta_query = $query->get('meta_query') ?: [];
+
+    // Exclude manually hidden shows
+    $meta_query[] = [
+        'relation' => 'OR',
+        [
+            'key' => '_cablecast_hide_from_listings',
+            'compare' => 'NOT EXISTS',
+        ],
+        [
+            'key' => '_cablecast_hide_from_listings',
+            'value' => '1',
+            'compare' => '!=',
+        ],
+    ];
+
+    // Exclude CG exempt shows
+    $meta_query[] = [
+        'relation' => 'OR',
+        [
+            'key' => 'cablecast_show_cg_exempt',
+            'compare' => 'NOT EXISTS',
+        ],
+        [
+            'key' => 'cablecast_show_cg_exempt',
+            'value' => '1',
+            'compare' => '!=',
+        ],
+    ];
+
+    $query->set('meta_query', $meta_query);
+}
