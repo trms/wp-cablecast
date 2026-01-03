@@ -458,6 +458,29 @@ class ShortcodesTest extends WP_UnitTestCase {
     }
 
     /**
+     * Test [cablecast_weekly_guide] channel switcher has no inline onchange handler.
+     * The onchange is handled by JavaScript in shortcodes.js.
+     */
+    public function test_weekly_guide_channel_switcher_no_inline_handler() {
+        // Channel switcher only shows when there are multiple channels
+        $second_channel = wp_insert_post([
+            'post_title' => 'Second Channel',
+            'post_type' => 'cablecast_channel',
+            'post_status' => 'publish',
+            'meta_input' => [
+                'cablecast_channel_id' => 2,
+            ],
+        ]);
+
+        $output = do_shortcode('[cablecast_weekly_guide show_channel_switcher="true"]');
+
+        // Should NOT have inline onchange handler - JavaScript handles this
+        $this->assertStringNotContainsString('onchange=', $output);
+
+        wp_delete_post($second_channel, true);
+    }
+
+    /**
      * Test [cablecast_weekly_guide] hides channel switcher when disabled.
      */
     public function test_weekly_guide_hide_channel_switcher() {
@@ -1238,5 +1261,221 @@ class ShortcodesTest extends WP_UnitTestCase {
         // Hours and minutes
         $this->assertEquals('1h 0m', cablecast_format_runtime(3600));  // 1 hour
         $this->assertEquals('1h 30m', cablecast_format_runtime(5445)); // 1h 30m 45s -> 1h 30m
+    }
+
+    // =========================================================================
+    // Schedule Data Tests (run_timestamp)
+    // =========================================================================
+
+    /**
+     * Test cablecast_get_schedules returns run_timestamp property.
+     */
+    public function test_get_schedules_includes_run_timestamp() {
+        // Get the channel's cablecast_channel_id meta value
+        $channel_id = get_post_meta($this->channel_post_id, 'cablecast_channel_id', true);
+
+        // Call cablecast_get_schedules
+        $schedules = cablecast_get_schedules($channel_id, date('Y-m-d'), date('Y-m-d', strtotime('+1 day')));
+
+        // Verify we got results
+        $this->assertNotEmpty($schedules);
+
+        // Check first item has run_timestamp
+        $first_item = $schedules[0];
+        $this->assertObjectHasProperty('run_timestamp', $first_item);
+        $this->assertIsInt($first_item->run_timestamp);
+        $this->assertGreaterThan(0, $first_item->run_timestamp);
+    }
+
+    /**
+     * Test run_timestamp is a valid Unix timestamp.
+     */
+    public function test_run_timestamp_is_valid_unix_time() {
+        $channel_id = get_post_meta($this->channel_post_id, 'cablecast_channel_id', true);
+        $schedules = cablecast_get_schedules($channel_id, date('Y-m-d'), date('Y-m-d', strtotime('+1 day')));
+
+        if (!empty($schedules)) {
+            $item = $schedules[0];
+            // Timestamp should be within reasonable range (2020-2030)
+            $this->assertGreaterThan(strtotime('2020-01-01'), $item->run_timestamp);
+            $this->assertLessThan(strtotime('2030-01-01'), $item->run_timestamp);
+        }
+    }
+
+    // =========================================================================
+    // Settings Sanitization Tests
+    // =========================================================================
+
+    /**
+     * Test cablecast_sanitize_options handles checkbox unchecked correctly.
+     */
+    public function test_sanitize_options_checkbox_unchecked() {
+        // Simulate form submission without checkbox field (unchecked)
+        $input = [
+            'server' => 'test.cablecast.tv',
+            // shortcode_styles is NOT in input (unchecked)
+        ];
+
+        $result = cablecast_sanitize_options($input);
+
+        // Checkbox should be explicitly false
+        $this->assertArrayHasKey('shortcode_styles', $result);
+        $this->assertFalse($result['shortcode_styles']);
+    }
+
+    /**
+     * Test cablecast_sanitize_options handles checkbox checked correctly.
+     */
+    public function test_sanitize_options_checkbox_checked() {
+        $input = [
+            'server' => 'test.cablecast.tv',
+            'shortcode_styles' => '1',
+        ];
+
+        $result = cablecast_sanitize_options($input);
+
+        $this->assertTrue($result['shortcode_styles']);
+    }
+
+    /**
+     * Test cablecast_sanitize_options preserves existing options.
+     */
+    public function test_sanitize_options_preserves_existing() {
+        // Set existing option
+        update_option('cablecast_options', [
+            'server' => 'existing.cablecast.tv',
+            'api_key' => 'existing-key',
+        ]);
+
+        // Submit new input with different field
+        $input = [
+            'shortcode_styles' => '1',
+        ];
+
+        $result = cablecast_sanitize_options($input);
+
+        // Existing options should be preserved
+        $this->assertEquals('existing.cablecast.tv', $result['server']);
+        $this->assertEquals('existing-key', $result['api_key']);
+    }
+
+    /**
+     * Test cablecast_sanitize_options handles all checkbox fields.
+     */
+    public function test_sanitize_options_all_checkboxes() {
+        $input = [
+            'server' => 'test.cablecast.tv',
+            // All checkboxes unchecked
+        ];
+
+        $result = cablecast_sanitize_options($input);
+
+        // All checkbox fields should be false when not in input
+        $this->assertFalse($result['shortcode_styles']);
+        $this->assertFalse($result['delete_local_thumbnails']);
+        $this->assertFalse($result['enable_category_colors']);
+    }
+
+    // =========================================================================
+    // Cablecast Home Shortcode Tests
+    // =========================================================================
+
+    /**
+     * Test [cablecast_home] is registered.
+     */
+    public function test_cablecast_home_registered() {
+        $this->assertTrue(shortcode_exists('cablecast_home'));
+    }
+
+    /**
+     * Test [cablecast_home] basic output structure.
+     */
+    public function test_cablecast_home_basic_output() {
+        $output = do_shortcode('[cablecast_home]');
+
+        $this->assertStringContainsString('cablecast-home', $output);
+    }
+
+    /**
+     * Test [cablecast_home] sections can be disabled.
+     */
+    public function test_cablecast_home_disable_sections() {
+        $output = do_shortcode('[cablecast_home show_now_playing="false" show_schedule="false" show_recent="false" show_browse="false"]');
+
+        // Should still have the container
+        $this->assertStringContainsString('cablecast-home', $output);
+
+        // But no section content when all disabled
+        $this->assertStringNotContainsString('cablecast-home__section--now-playing', $output);
+        $this->assertStringNotContainsString('cablecast-home__section--schedule', $output);
+        $this->assertStringNotContainsString('cablecast-home__section--recent', $output);
+        $this->assertStringNotContainsString('cablecast-home__section--browse', $output);
+    }
+
+    /**
+     * Test [cablecast_home] with custom class.
+     */
+    public function test_cablecast_home_custom_class() {
+        $output = do_shortcode('[cablecast_home class="my-custom-class"]');
+
+        $this->assertStringContainsString('my-custom-class', $output);
+    }
+
+    /**
+     * Test [cablecast_home] channel tabs render when multiple channels exist.
+     */
+    public function test_cablecast_home_channel_tabs() {
+        // Create a second channel
+        $second_channel = wp_insert_post([
+            'post_title' => 'Second Channel',
+            'post_type' => 'cablecast_channel',
+            'post_status' => 'publish',
+            'meta_input' => [
+                'cablecast_channel_id' => 2,
+            ],
+        ]);
+
+        $output = do_shortcode('[cablecast_home]');
+
+        // Should have channel tabs
+        $this->assertStringContainsString('cablecast-home__channel-tabs', $output);
+        $this->assertStringContainsString('cablecast-home__channel-tab', $output);
+        $this->assertStringContainsString('data-channel="', $output);
+
+        wp_delete_post($second_channel, true);
+    }
+
+    /**
+     * Test [cablecast_home] channel tabs have proper data attributes for JS.
+     */
+    public function test_cablecast_home_channel_tabs_data_attributes() {
+        $second_channel = wp_insert_post([
+            'post_title' => 'Second Channel',
+            'post_type' => 'cablecast_channel',
+            'post_status' => 'publish',
+            'meta_input' => [
+                'cablecast_channel_id' => 2,
+            ],
+        ]);
+
+        $output = do_shortcode('[cablecast_home]');
+
+        // Check for data-channel attribute with channel ID
+        $this->assertStringContainsString('data-channel="' . $this->channel_post_id . '"', $output);
+        $this->assertStringContainsString('data-channel="' . $second_channel . '"', $output);
+
+        wp_delete_post($second_channel, true);
+    }
+
+    /**
+     * Test [cablecast_home] browse section contains expected links.
+     */
+    public function test_cablecast_home_browse_section() {
+        $output = do_shortcode('[cablecast_home show_now_playing="false" show_schedule="false" show_recent="false" show_browse="true"]');
+
+        // Browse section should contain series, categories, producers headings
+        $this->assertStringContainsString('Series', $output);
+        $this->assertStringContainsString('Categories', $output);
+        $this->assertStringContainsString('Producers', $output);
     }
 }
