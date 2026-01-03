@@ -95,8 +95,10 @@ function cablecast_register_taxonomies() {
         'show_in_menu'      => true,
         'show_in_nav_menus' => true,
         'capabilities' => array(
-          'edit_terms' => '',
-          'delete_terms' => ''
+          'manage_terms' => 'manage_categories',
+          'edit_terms' => 'manage_categories',
+          'delete_terms' => 'manage_categories',
+          'assign_terms' => 'edit_posts'
         ),
         'rewrite'           => array(
           'slug' => 'series',
@@ -479,6 +481,16 @@ function cablecast_is_hidden($post_id) {
         }
     }
 
+    // Check tags
+    $tags = wp_get_post_terms($post_id, 'post_tag', ['fields' => 'ids']);
+    if (!is_wp_error($tags)) {
+        foreach ($tags as $term_id) {
+            if (get_term_meta($term_id, '_cablecast_hide_from_listings', true) === '1') {
+                return true;
+            }
+        }
+    }
+
     return false;
 }
 
@@ -557,6 +569,7 @@ function cablecast_save_visibility_meta($post_id) {
 add_action('cablecast_producer_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
 add_action('cablecast_project_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
 add_action('category_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
+add_action('post_tag_edit_form_fields', 'cablecast_taxonomy_visibility_field', 10, 2);
 
 function cablecast_taxonomy_visibility_field($term, $taxonomy) {
     $hidden = get_term_meta($term->term_id, '_cablecast_hide_from_listings', true);
@@ -580,6 +593,7 @@ function cablecast_taxonomy_visibility_field($term, $taxonomy) {
 add_action('edited_cablecast_producer', 'cablecast_save_taxonomy_visibility');
 add_action('edited_cablecast_project', 'cablecast_save_taxonomy_visibility');
 add_action('edited_category', 'cablecast_save_taxonomy_visibility');
+add_action('edited_post_tag', 'cablecast_save_taxonomy_visibility');
 
 function cablecast_save_taxonomy_visibility($term_id) {
     $hidden = isset($_POST['cablecast_hide_from_listings']) ? '1' : '';
