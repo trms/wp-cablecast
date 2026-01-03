@@ -342,6 +342,11 @@ function cablecast_schedule_shortcode($atts) {
             continue;
         }
 
+        // Skip hidden shows
+        if (!empty($item->show_post_id) && cablecast_is_hidden($item->show_post_id)) {
+            continue;
+        }
+
         // Use run_timestamp for timezone-safe comparisons
         $item_timestamp = $item->run_timestamp;
 
@@ -509,6 +514,12 @@ function cablecast_now_playing_shortcode($atts) {
         });
         $items = array_values($items);
     }
+
+    // Filter hidden shows
+    $items = array_filter($items, function($item) {
+        return empty($item->show_post_id) || !cablecast_is_hidden($item->show_post_id);
+    });
+    $items = array_values($items);
 
     // Find current and next shows
     $current_show = null;
@@ -760,6 +771,11 @@ function cablecast_weekly_guide_shortcode($atts) {
             $output .= '</div>';
         } else {
             foreach ($day_items as $item) {
+                // Skip hidden shows
+                if (!empty($item->show_post_id) && cablecast_is_hidden($item->show_post_id)) {
+                    continue;
+                }
+
                 $show = cablecast_get_show_from_schedule($item);
                 $item_time = date('g:i A', strtotime($item->run_date_time));
 
@@ -920,6 +936,11 @@ function cablecast_shows_shortcode($atts) {
     while ($query->have_posts()) {
         $query->the_post();
         $show_id = get_the_ID();
+
+        // Skip hidden shows
+        if (cablecast_is_hidden($show_id)) {
+            continue;
+        }
 
         // Featured layout: first item is large
         $item_classes = ['cablecast-shows__item'];
@@ -1315,6 +1336,15 @@ function cablecast_producers_shortcode($atts) {
         return '<p class="cablecast-no-results">' . __('No producers found.', 'cablecast') . '</p>';
     }
 
+    // Filter out hidden producers
+    $terms = array_filter($terms, function($term) {
+        return !cablecast_is_term_hidden($term->term_id);
+    });
+
+    if (empty($terms)) {
+        return '<p class="cablecast-no-results">' . __('No producers found.', 'cablecast') . '</p>';
+    }
+
     $layout = in_array($atts['layout'], ['grid', 'list']) ? $atts['layout'] : 'list';
     $show_contact = filter_var($atts['show_contact'], FILTER_VALIDATE_BOOLEAN);
 
@@ -1387,6 +1417,15 @@ function cablecast_series_shortcode($atts) {
     ]);
 
     if (empty($terms) || is_wp_error($terms)) {
+        return '<p class="cablecast-no-results">' . __('No series found.', 'cablecast') . '</p>';
+    }
+
+    // Filter out hidden series
+    $terms = array_filter($terms, function($term) {
+        return !cablecast_is_term_hidden($term->term_id);
+    });
+
+    if (empty($terms)) {
         return '<p class="cablecast-no-results">' . __('No series found.', 'cablecast') . '</p>';
     }
 
@@ -1809,6 +1848,15 @@ function cablecast_categories_shortcode($atts) {
     ]);
 
     if (empty($categories) || is_wp_error($categories)) {
+        return '';
+    }
+
+    // Filter out hidden categories
+    $categories = array_filter($categories, function($term) {
+        return !cablecast_is_term_hidden($term->term_id);
+    });
+
+    if (empty($categories)) {
         return '';
     }
 

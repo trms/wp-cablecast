@@ -375,6 +375,9 @@ function cablecast_sync_single_show($show, $shows_payload, $categories, $project
   $trt = cablecast_calculate_trt($show, $shows_payload->reels);
   cablecast_upsert_post_meta($id, "cablecast_show_trt", $trt);
 
+  // Sync CG exempt flag (used for auto-hiding from listings)
+  cablecast_upsert_post_meta($id, "cablecast_show_cg_exempt", !empty($show->cgExempt) ? '1' : '');
+
   // Handle thumbnails based on mode setting
   if ($thumbnail_mode === 'local') {
     // Original behavior - download thumbnails as WordPress attachments
