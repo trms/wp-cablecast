@@ -1271,14 +1271,29 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test cablecast_get_schedules returns run_timestamp property.
      */
     public function test_get_schedules_includes_run_timestamp() {
+        global $wpdb;
+
+        // Insert schedule item in UTC for today (so the query can find it)
+        $utc_now = gmdate('Y-m-d H:i:s');
+        $wpdb->insert($this->schedule_table, [
+            'run_date_time' => $utc_now,
+            'show_id' => 99999,
+            'show_title' => 'Timestamp Test Show',
+            'channel_id' => 1,
+            'show_post_id' => $this->show_post_id,
+            'channel_post_id' => $this->channel_post_id,
+            'schedule_item_id' => 9999,
+            'cg_exempt' => 0,
+        ]);
+
         // Get the channel's cablecast_channel_id meta value
         $channel_id = get_post_meta($this->channel_post_id, 'cablecast_channel_id', true);
 
-        // Call cablecast_get_schedules
-        $schedules = cablecast_get_schedules($channel_id, date('Y-m-d'), date('Y-m-d', strtotime('+1 day')));
+        // Call cablecast_get_schedules - use current_time for site timezone
+        $schedules = cablecast_get_schedules($channel_id, current_time('Y-m-d'), date('Y-m-d', strtotime('+1 day')));
 
         // Verify we got results
-        $this->assertNotEmpty($schedules);
+        $this->assertNotEmpty($schedules, 'Should find schedule items for today');
 
         // Check first item has run_timestamp
         $first_item = $schedules[0];
@@ -1291,15 +1306,30 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test run_timestamp is a valid Unix timestamp.
      */
     public function test_run_timestamp_is_valid_unix_time() {
-        $channel_id = get_post_meta($this->channel_post_id, 'cablecast_channel_id', true);
-        $schedules = cablecast_get_schedules($channel_id, date('Y-m-d'), date('Y-m-d', strtotime('+1 day')));
+        global $wpdb;
 
-        if (!empty($schedules)) {
-            $item = $schedules[0];
-            // Timestamp should be within reasonable range (2020-2030)
-            $this->assertGreaterThan(strtotime('2020-01-01'), $item->run_timestamp);
-            $this->assertLessThan(strtotime('2030-01-01'), $item->run_timestamp);
-        }
+        // Insert schedule item in UTC
+        $utc_now = gmdate('Y-m-d H:i:s');
+        $wpdb->insert($this->schedule_table, [
+            'run_date_time' => $utc_now,
+            'show_id' => 99998,
+            'show_title' => 'Unix Time Test Show',
+            'channel_id' => 1,
+            'show_post_id' => $this->show_post_id,
+            'channel_post_id' => $this->channel_post_id,
+            'schedule_item_id' => 9998,
+            'cg_exempt' => 0,
+        ]);
+
+        $channel_id = get_post_meta($this->channel_post_id, 'cablecast_channel_id', true);
+        $schedules = cablecast_get_schedules($channel_id, current_time('Y-m-d'), date('Y-m-d', strtotime('+1 day')));
+
+        $this->assertNotEmpty($schedules, 'Should find schedule items');
+
+        $item = $schedules[0];
+        // Timestamp should be within reasonable range (2020-2030)
+        $this->assertGreaterThan(strtotime('2020-01-01'), $item->run_timestamp);
+        $this->assertLessThan(strtotime('2030-01-01'), $item->run_timestamp);
     }
 
     // =========================================================================
@@ -1310,6 +1340,11 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test cablecast_sanitize_options handles checkbox unchecked correctly.
      */
     public function test_sanitize_options_checkbox_unchecked() {
+        // Load settings.php if not already loaded (it's only loaded in admin context)
+        if (!function_exists('cablecast_sanitize_options')) {
+            require_once dirname(__DIR__) . '/includes/settings.php';
+        }
+
         // Simulate form submission without checkbox field (unchecked)
         $input = [
             'server' => 'test.cablecast.tv',
@@ -1327,6 +1362,10 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test cablecast_sanitize_options handles checkbox checked correctly.
      */
     public function test_sanitize_options_checkbox_checked() {
+        if (!function_exists('cablecast_sanitize_options')) {
+            require_once dirname(__DIR__) . '/includes/settings.php';
+        }
+
         $input = [
             'server' => 'test.cablecast.tv',
             'shortcode_styles' => '1',
@@ -1341,6 +1380,10 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test cablecast_sanitize_options preserves existing options.
      */
     public function test_sanitize_options_preserves_existing() {
+        if (!function_exists('cablecast_sanitize_options')) {
+            require_once dirname(__DIR__) . '/includes/settings.php';
+        }
+
         // Set existing option
         update_option('cablecast_options', [
             'server' => 'existing.cablecast.tv',
@@ -1363,6 +1406,10 @@ class ShortcodesTest extends WP_UnitTestCase {
      * Test cablecast_sanitize_options handles all checkbox fields.
      */
     public function test_sanitize_options_all_checkboxes() {
+        if (!function_exists('cablecast_sanitize_options')) {
+            require_once dirname(__DIR__) . '/includes/settings.php';
+        }
+
         $input = [
             'server' => 'test.cablecast.tv',
             // All checkboxes unchecked
