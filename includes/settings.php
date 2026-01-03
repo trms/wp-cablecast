@@ -119,6 +119,7 @@ function cablecast_sanitize_options($input) {
         'shortcode_styles',
         'delete_local_thumbnails',
         'enable_category_colors',
+        'enable_templates',
     ];
 
     // If input is not an array, return current options
@@ -218,6 +219,14 @@ function cablecast_settings_init()
         'cablecast_field_shortcode_styles',
         __('Default Styling', 'cablecast'),
         'cablecast_field_shortcode_styles_cb',
+        'cablecast',
+        'cablecast_section_shortcodes'
+    );
+
+    add_settings_field(
+        'cablecast_field_enable_templates',
+        __('Plugin Templates', 'cablecast'),
+        'cablecast_field_enable_templates_cb',
         'cablecast',
         'cablecast_section_shortcodes'
     );
@@ -625,6 +634,24 @@ function cablecast_field_shortcode_styles_cb($args)
         </label>
         <p class="description" style="margin-top: 4px;">
             <?php _e('When enabled, shortcodes include professional default CSS. Disable for full theme control over styling.', 'cablecast'); ?>
+        </p>
+    </fieldset>
+    <?php
+}
+
+function cablecast_field_enable_templates_cb($args)
+{
+    $options = get_option('cablecast_options');
+    // Default to true if never saved, otherwise use the saved value
+    $templates_enabled = !isset($options['enable_templates']) ? true : (bool) $options['enable_templates'];
+    ?>
+    <fieldset>
+        <label>
+            <input type="checkbox" name="cablecast_options[enable_templates]" value="1" <?php checked($templates_enabled); ?>>
+            <?php _e('Enable plugin templates for show, channel, and archive pages', 'cablecast'); ?>
+        </label>
+        <p class="description" style="margin-top: 4px;">
+            <?php _e('When enabled, the plugin provides templates for single shows, channels, producers, and series pages. Disable if your theme provides its own templates.', 'cablecast'); ?>
         </p>
     </fieldset>
     <?php

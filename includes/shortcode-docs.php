@@ -25,7 +25,7 @@ function cablecast_get_shortcode_docs() {
             'attributes' => [
                 ['name' => 'channel', 'required' => true, 'default' => '', 'options' => 'Channel post ID', 'description' => 'WordPress post ID of the channel to display'],
                 ['name' => 'date', 'required' => false, 'default' => 'Today', 'options' => 'Y-m-d format', 'description' => 'Specific date to show schedule for (e.g., 2024-01-15)'],
-                ['name' => 'mode', 'required' => false, 'default' => 'all', 'options' => 'all, remaining, next', 'description' => 'Filter which programs to display'],
+                ['name' => 'mode', 'required' => false, 'default' => 'all', 'options' => 'all, remaining, next', 'description' => 'Filter programs: "all" shows entire day, "remaining" shows rest of today only, "next" shows next 24 hours from now'],
                 ['name' => 'count', 'required' => false, 'default' => '20', 'options' => 'Any number', 'description' => 'Maximum number of programs to show'],
                 ['name' => 'show_descriptions', 'required' => false, 'default' => 'true', 'options' => 'true, false', 'description' => 'Show program descriptions'],
                 ['name' => 'exclude_filler', 'required' => false, 'default' => 'false', 'options' => 'true, false', 'description' => 'Hide filler content (color bars, station IDs, etc.)'],
@@ -86,7 +86,7 @@ function cablecast_get_shortcode_docs() {
                 ['name' => 'producer', 'required' => false, 'default' => '', 'options' => 'Slug or ID', 'description' => 'Filter by producer slug or term ID'],
                 ['name' => 'series', 'required' => false, 'default' => '', 'options' => 'Slug or ID', 'description' => 'Filter by series/project slug or term ID'],
                 ['name' => 'count', 'required' => false, 'default' => '12', 'options' => 'Any number', 'description' => 'Number of shows to display'],
-                ['name' => 'orderby', 'required' => false, 'default' => 'date', 'options' => 'date, title, event_date', 'description' => 'How to sort the shows'],
+                ['name' => 'orderby', 'required' => false, 'default' => 'date', 'options' => 'date, title, event_date', 'description' => 'Sort order: "date" uses WordPress post date (sync time), "title" sorts alphabetically, "event_date" uses original Cablecast production date'],
                 ['name' => 'order', 'required' => false, 'default' => 'DESC', 'options' => 'ASC, DESC', 'description' => 'Sort direction'],
                 ['name' => 'layout', 'required' => false, 'default' => 'grid', 'options' => 'grid, list, featured', 'description' => 'Display layout style. Featured makes first show larger.'],
                 ['name' => 'columns', 'required' => false, 'default' => '4', 'options' => '2-6', 'description' => 'Number of columns (grid/featured layout)'],
@@ -195,7 +195,7 @@ function cablecast_get_shortcode_docs() {
             'long_description' => 'Displays channel schedule in an interactive calendar using FullCalendar.io. Users can switch between week, day, month, and list views. Events are color-coded by category and clicking navigates to show pages. Includes navigation buttons, current time indicator, and responsive design.',
             'attributes' => [
                 ['name' => 'channel', 'required' => true, 'default' => '', 'options' => 'Channel post ID', 'description' => 'WordPress post ID of the channel to display'],
-                ['name' => 'view', 'required' => false, 'default' => 'timeGridWeek', 'options' => 'timeGridWeek, timeGridDay, dayGridMonth, listWeek', 'description' => 'Initial calendar view'],
+                ['name' => 'view', 'required' => false, 'default' => 'timeGridWeek', 'options' => 'timeGridWeek, timeGridDay, dayGridMonth, dayGridWeek, dayGridDay, listWeek, listDay', 'description' => 'Initial calendar view'],
                 ['name' => 'height', 'required' => false, 'default' => 'auto', 'options' => 'auto, number', 'description' => 'Calendar height (auto or pixels)'],
                 ['name' => 'header', 'required' => false, 'default' => 'true', 'options' => 'true, false', 'description' => 'Show view switching buttons in toolbar'],
                 ['name' => 'nav', 'required' => false, 'default' => 'true', 'options' => 'true, false', 'description' => 'Show prev/next/today navigation buttons'],
@@ -249,7 +249,7 @@ function cablecast_get_shortcode_docs() {
             'name' => 'Home Page',
             'tag' => 'cablecast_home',
             'description' => 'Display a complete home page with all sections.',
-            'long_description' => 'Creates a full home page layout with Now Playing hero, weekly schedule grid, recent shows gallery, and browse section. Perfect for creating a TV station home page out-of-the-box. Settings can be customized in the Cablecast settings page.',
+            'long_description' => 'Creates a full home page layout with Now Playing hero, weekly schedule grid, recent shows gallery, and browse section. Perfect for creating a TV station home page out-of-the-box. Settings can be customized in the Cablecast settings page. The page created by the "Create Cablecast Home Page" button simply contains this shortcode. To customize the layout beyond shortcode attributes, themes can override the template at yourtheme/cablecast/page-cablecast-home.php.',
             'attributes' => [
                 ['name' => 'show_now_playing', 'required' => false, 'default' => 'true', 'options' => 'true, false', 'description' => 'Show the Now Playing hero section'],
                 ['name' => 'show_schedule', 'required' => false, 'default' => 'true', 'options' => 'true, false', 'description' => 'Show the weekly schedule grid'],
