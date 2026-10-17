@@ -10,6 +10,44 @@ I've set up a simple demo site that I'll be expanding with examples of how to do
 ## Installation
 Upload the plugin and activate it. Then in the admin dashboard navigate to `Cablecast Settings`. There is a single input for the `Cablecast Server Address`. This is the url you use to login to Cablecast from the public internet. Example `http://tighty.tv`.
 
+## Local Development
+A Docker based dev environment is included. It runs WordPress with this repo mounted as the plugin, a MariaDB database, a container that runs WP-Cron every minute (instead of during page loads), and a PHPUnit runner.
+
+Requirements: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or another Docker runtime with `docker compose`) and `make`. PHP and Composer are not needed on your machine.
+
+```sh
+make up        # build, start, install WordPress, activate the plugin
+```
+
+- Site: http://localhost:8080
+- Admin: http://localhost:8080/wp-admin (`admin` / `admin`)
+- The plugin is pre-configured to sync from `https://rays-house.cablecast.net`. Copy `.env.example` to `.env` to change the server, ports, or PHP version, then run `make up` again.
+
+Common commands:
+
+|Command|Description|
+|---|---|
+|`make sync`|Run the Cablecast sync now instead of waiting for cron|
+|`make wp ARGS="post list --post_type=show"`|Run any WP-CLI command|
+|`make debug-log`|Tail `wp-content/debug.log`|
+|`make logs`|Tail container logs|
+|`make tools`|Start phpMyAdmin on http://localhost:8081|
+|`make down`|Stop containers (keeps data)|
+|`make reset`|Delete containers and all data|
+
+### Tests
+```sh
+make test                          # PHP 8.2, latest WordPress
+make test PHP=7.4 WP=6.2           # any version CI tests against
+make test ARGS="--filter SyncLock" # pass args to PHPUnit
+make test-matrix                   # the full CI matrix
+```
+
+The WordPress test suite for each version is cached in a Docker volume. Run `make test-clean` to re-download it (for example, to pick up a new `latest`).
+
+### Debugging
+Xdebug is installed in the WordPress container and starts when a request carries the `XDEBUG_TRIGGER` cookie (set it with a browser extension such as Xdebug Helper). It connects to port 9003. `.vscode/launch.json` contains the path mappings for VS Code's PHP Debug extension.
+
 ## Important Notes About cron_schedules
 TL;DR - Follow these instructions for setting up wordpress cron: https://developer.wordpress.org/plugins/cron/hooking-into-the-system-task-scheduler/
 

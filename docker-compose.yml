@@ -1,0 +1,119 @@
+# Local development environment. See "Local Development" in README.md.
+
+x-wp-env: &wp-env
+  WORDPRESS_DB_HOST: db
+  WORDPRESS_DB_USER: wordpress
+  WORDPRESS_DB_PASSWORD: wordpress
+  WORDPRESS_DB_NAME: wordpress
+  WORDPRESS_DEBUG: 1
+  WORDPRESS_CONFIG_EXTRA: |
+    define('WP_ENVIRONMENT_TYPE', 'local');
+    define('WP_DEBUG_LOG', true);
+    define('WP_DEBUG_DISPLAY', false);
+    define('DISABLE_WP_CRON', true);
+
+x-wp-volumes: &wp-volumes
+  - wordpress:/var/www/html
+  - .:/var/www/html/wp-content/plugins/wp-cablecast
+
+x-wp-cli: &wp-cli
+  image: wordpress:cli
+  # Match the apache image's www-data uid so files in the shared volume stay writable.
+  user: "33:33"
+  environment:
+    <<: *wp-env
+    WP_CLI_CACHE_DIR: /tmp/wp-cli-cache
+    WP_PORT: ${WP_PORT:-8080}
+    CABLECAST_SERVER: ${CABLECAST_SERVER:-https://rays-house.cablecast.net}
+  volumes: *wp-volumes
+  depends_on:
+    db:
+      condition: service_healthy
+    wordpress:
+      condition: service_started
+
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+    volumes:
+      - db:/var/lib/mysql
+      - ./docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wordpress:
+    build:
+      context: docker/wordpress
+      args:
+        PHP_VERSION: ${WP_PHP_VERSION:-8.2}
+    ports:
+      - "${WP_PORT:-8080}:80"
+    environment:
+      <<: *wp-env
+      XDEBUG_MODE: ${XDEBUG_MODE:-debug}
+    volumes: *wp-volumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # One-off WP-CLI commands: `make wp ARGS="plugin list"`
+  cli:
+    <<: *wp-cli
+    profiles: ["cli"]
+
+  # Runs WP-Cron from outside web requests, as the README recommends for production.
+  cron:
+    <<: *wp-cli
+    command: >
+      sh -c 'while true; do
+        wp core is-installed 2>/dev/null && wp cron event run --due-now --quiet;
+        sleep 60;
+      done'
+    restart: unless-stopped
+
+  # PHPUnit runner: `make test` / `make test PHP=7.4 WP=6.2`
+  tests:
+    build:
+      context: docker/tests
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.2}
+    image: wp-cablecast-tests:php${PHP_VERSION:-8.2}
+    profiles: ["tests"]
+    environment:
+      WP_VERSION: ${WP_VERSION:-latest}
+      COMPOSER_CACHE_DIR: /cache/composer
+    volumes:
+      - .:/app
+      - test-cache:/cache
+    command: bash bin/docker-test.sh
+    depends_on:
+      db:
+        condition: service_healthy
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    profiles: ["tools"]
+    ports:
+      - "${PMA_PORT:-8081}:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: root
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db:
+  wordpress:
+  test-cache:
