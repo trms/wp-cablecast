@@ -26,7 +26,8 @@ if ! wp core is-installed 2>/dev/null; then
         --skip-email
 fi
 
-wp rewrite structure '/%postname%/' --hard
+# The wordpress image ships a rewrite-ready .htaccess, so no --hard needed.
+wp rewrite structure '/%postname%/'
 wp plugin activate wp-cablecast
 
 if [ -n "$CABLECAST_SERVER" ]; then

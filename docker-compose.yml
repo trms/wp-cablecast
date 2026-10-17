@@ -34,7 +34,8 @@ x-wp-cli: &wp-cli
 
 services:
   db:
-    image: mariadb:10.11
+    # 11.4+ enables TLS out of the box, which WP-CLI's MariaDB client requires.
+    image: mariadb:11.8
     environment:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_DATABASE: wordpress
