@@ -8,7 +8,8 @@ composer.lock
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/launch.json
 *.swp
 *.swo
 
@@ -21,3 +22,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Docker dev environment
+.env
