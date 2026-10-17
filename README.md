@@ -32,8 +32,11 @@ Common commands:
 |`make debug-log`|Tail `wp-content/debug.log`|
 |`make logs`|Tail container logs|
 |`make tools`|Start phpMyAdmin on http://localhost:8081|
+|`make tailscale`|Share the site on your tailnet at `https://<machine>.<tailnet>.ts.net:8443` (`make tailscale-off` to stop)|
 |`make down`|Stop containers (keeps data)|
 |`make reset`|Delete containers and all data|
+
+WordPress uses whatever host it's reached by, so the site also works behind a proxy such as Tailscale Serve or ngrok without changing its URL. `make tailscale` uses [Tailscale Serve](https://tailscale.com/kb/1312/serve), which also gets around the macOS firewall blocking direct tailnet connections to Docker ports.
 
 ### Tests
 ```sh

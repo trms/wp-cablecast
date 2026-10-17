@@ -4,11 +4,13 @@
 
 PHP ?= $(or $(PHP_VERSION),8.2)
 WP  ?= $(or $(WP_VERSION),latest)
+WP_PORT ?= 8080
+TS_PORT ?= 8443
 
 COMPOSE = docker compose
 WPCLI   = $(COMPOSE) run --rm cli
 
-.PHONY: up down setup wp sync logs debug-log tools test test-matrix test-clean reset
+.PHONY: up down setup wp sync logs debug-log tools tailscale tailscale-off test test-matrix test-clean reset
 
 up: ## Start the dev site and install WordPress on first run
 	$(COMPOSE) up -d --build
@@ -34,6 +36,12 @@ debug-log: ## Tail wp-content/debug.log
 
 tools: ## Start phpMyAdmin on http://localhost:8081
 	$(COMPOSE) --profile tools up -d phpmyadmin
+
+tailscale: ## Share the dev site on your tailnet over HTTPS (port TS_PORT, default 8443)
+	tailscale serve --bg --https=$(TS_PORT) http://localhost:$(WP_PORT)
+
+tailscale-off: ## Stop sharing the dev site on your tailnet
+	tailscale serve --https=$(TS_PORT) off
 
 test: ## Run PHPUnit: make test [PHP=7.4] [WP=6.2] [ARGS="--filter Foo"]
 	PHP_VERSION=$(PHP) WP_VERSION=$(WP) $(COMPOSE) run --rm --build tests bash bin/docker-test.sh $(ARGS)

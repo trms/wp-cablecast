@@ -11,6 +11,14 @@ x-wp-env: &wp-env
     define('WP_DEBUG_LOG', true);
     define('WP_DEBUG_DISPLAY', false);
     define('DISABLE_WP_CRON', true);
+    // Use whatever host the site is reached by (localhost, a Tailscale/ngrok proxy, ...).
+    if (!empty($$_SERVER['HTTP_HOST'])) {
+        $$https = (!empty($$_SERVER['HTTPS']) && $$_SERVER['HTTPS'] !== 'off')
+            || ($$_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+        if ($$https) { $$_SERVER['HTTPS'] = 'on'; }
+        define('WP_HOME', ($$https ? 'https' : 'http') . '://' . $$_SERVER['HTTP_HOST']);
+        define('WP_SITEURL', WP_HOME);
+    }
 
 x-wp-volumes: &wp-volumes
   - wordpress:/var/www/html
